@@ -1,0 +1,42 @@
+# Binários compilados
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Diretórios de build
+/build/
+/bin/
+
+# Arquivos temporários
+*.log
+*.tmp
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Go modules
+/go.sum
+/go.mod
+
+# Configs sensíveis
+.env
+.env.local
+.env.development
+.env.production
+
+# Banco local (se usar SQLite)
+*.db
+*.sqlite
+
+# Cache
+__pycache__/
+*.cache
