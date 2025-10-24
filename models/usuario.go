@@ -8,6 +8,7 @@ type Usuario struct {
 	Email         string `gorm:"unique"`
 	Senha         string
 	ClinicaID     uint
+	Clinica       Clinica `gorm:"foreignKey:ClinicaID"`
 	TipoUsuarioID uint
 	Ativo         bool
 	TipoUsuario   TipoUsuario `gorm:"foreignKey:TipoUsuarioID"`
