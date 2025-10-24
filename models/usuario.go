@@ -9,6 +9,7 @@ type Usuario struct {
 	Senha         string
 	ClinicaID     uint
 	TipoUsuarioID uint
+	Ativo         bool
 	TipoUsuario   TipoUsuario `gorm:"foreignKey:TipoUsuarioID"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time

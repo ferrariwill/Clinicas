@@ -40,7 +40,7 @@ func (s *authService) Login(email string, senha string) (*models.Usuario, error)
 }
 
 func (s *authService) AlterarSenha(usuarioId uint, senhaAtual string, novaSenha string) error {
-	usuario, err := s.usuarioRepo.BuscarUsuarioPorId(usuarioId)
+	usuario, err := s.usuarioRepo.BuscarPorID(usuarioId)
 
 	if err != nil {
 		return err
