@@ -4,15 +4,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/ferrariwill/Clinicas/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func GerarToken(usuarioID uint, tipoUsuarioID uint, clinicaID uint) (string, error) {
+func GerarToken(usuario *models.Usuario) (string, error) {
 	claims := jwt.MapClaims{
-		"usuario_id":      usuarioID,
-		"tipo_usuario_id": tipoUsuarioID,
-		"clinica_id":      clinicaID,
+		"usuario_id":      usuario.ID,
+		"tipo_usuario_id": usuario.TipoUsuarioID,
+		"clinica_id":      usuario.ClinicaID,
+		"plano_id":        usuario.Clinica.Assinatura.PlanoID,
 		"exp":             time.Now().Add(time.Hour * 24).Unix(),
 	}
 

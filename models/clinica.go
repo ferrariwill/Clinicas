@@ -9,6 +9,6 @@ type Clinica struct {
 	Ativa            bool
 	EmailResponsavel string
 	Capacidade       int
-	Usuarios         []Usuario    `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"`
-	Assinaturas      []Assinatura `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"`
+	Usuarios         []Usuario  `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"`
+	Assinatura       *Assinatura `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"` 
 }
