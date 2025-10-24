@@ -5,5 +5,5 @@ type TipoUsuario struct {
 	Nome      string
 	Descricao string
 	ClinicaID uint
-	Clinica   Clinica `gorm:"foreignKey:ClinicaID"`
+	Clinica   Clinica `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"`
 }

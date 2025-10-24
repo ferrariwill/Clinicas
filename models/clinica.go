@@ -1,16 +1,14 @@
 package models
 
-import "time"
+import "gorm.io/gorm"
 
 type Clinica struct {
-	ID               uint `gorm:"primary_key"`
+	gorm.Model
 	Nome             string
 	CNPJ             string
-	Endereco         string
-	Plano            string
+	Ativa            bool
 	EmailResponsavel string
 	Capacidade       int
-	Ativa            bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	Usuarios         []Usuario    `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"`
+	Assinaturas      []Assinatura `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"`
 }

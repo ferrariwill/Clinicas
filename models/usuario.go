@@ -1,17 +1,15 @@
 package models
 
-import "time"
+import "gorm.io/gorm"
 
 type Usuario struct {
-	ID            uint `gorm:"primaryKey"`
+	gorm.Model
 	Nome          string
 	Email         string `gorm:"unique"`
 	Senha         string
-	ClinicaID     uint
-	Clinica       Clinica `gorm:"foreignKey:ClinicaID"`
-	TipoUsuarioID uint
 	Ativo         bool
-	TipoUsuario   TipoUsuario `gorm:"foreignKey:TipoUsuarioID"`
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ClinicaID     uint
+	Clinica       Clinica `gorm:"foreignKey:ClinicaID;constraint:OnDelete:CASCADE"`
+	TipoUsuarioID uint
+	TipoUsuario   TipoUsuario `gorm:"foreignKey:TipoUsuarioID;constraint:OnDelete:CASCADE"`
 }

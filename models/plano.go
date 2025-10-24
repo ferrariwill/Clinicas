@@ -8,4 +8,7 @@ type Plano struct {
 	Descricao      string  `json:"descricao"`
 	ValorMensal    float64 `json:"valor_mensal"`
 	LimiteUsuarios int     `json:"limite_usuarios"`
+
+	Assinaturas []Assinatura `json:"assinaturas" gorm:"foreignKey:PlanoID;constraint:OnDelete:CASCADE"`
+	Telas       []Tela       `json:"telas" gorm:"foreignKey:PlanoID;constraint:OnDelete:CASCADE"`
 }
