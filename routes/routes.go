@@ -12,16 +12,17 @@ import (
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	//Inicializacao de repositorios
 	usurioRepo := repositories.NovoUsuarioRepository(db)
-	//clinicaRepo := repositories.NovoClinicaRepository(db)
+	clinicaRepo := repositories.NovaClinicaRepository(db)
 	tokenRepo := repositories.NovoTokenRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
 	usuarioService := services.NovoUsuarioService(usurioRepo)
-	//clinicaService := services.NovoClinicaService(clinicaRepo)
+	clinicaService := services.NovoClinicaService(clinicaRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
+	clinicaController := controllers.NovaClinicaController(clinicaService)
 
 	//Endpoints referente a parte de autenticação
 
@@ -39,6 +40,17 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		usuarios.PUT("/:id", usuarioController.Atualizar)
 		usuarios.DELETE("/:id", usuarioController.Deletar)
 		usuarios.PUT("/:id/reativar", usuarioController.Ativar)
+	}
+
+	//endpoints referente a parte de clinica
+	clinicas := r.Group("/clinicas", middleware.Autenticado())
+	{
+		clinicas.POST("", clinicaController.Criar)
+		clinicas.GET("", clinicaController.Listar)
+		clinicas.GET("/:id", clinicaController.Buscar)
+		clinicas.PUT("/:id", clinicaController.Atualizar)
+		clinicas.DELETE("/:id", clinicaController.Desativar)
+		clinicas.PUT("/:id/reativar", clinicaController.Reativar)
 	}
 
 }
