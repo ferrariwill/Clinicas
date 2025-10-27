@@ -10,6 +10,12 @@ import (
 )
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
+
+	//Inicialização do middleware de permissao de acesso a telas
+	planoTelaRepo := repositories.NovoPlanoTelaRepository(db)
+	planoTelaSevice := services.NovoPlanoTelaService(planoTelaRepo)
+	verificarPermissao := middleware.NovaVerificacaoTelaMiddleware(planoTelaSevice)
+
 	//Inicializacao de repositorios
 	usurioRepo := repositories.NovoUsuarioRepository(db)
 	clinicaRepo := repositories.NovaClinicaRepository(db)
@@ -23,6 +29,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
 	clinicaController := controllers.NovaClinicaController(clinicaService)
+	financeiroController := controllers.NovoFinanceiroController()
 
 	//Endpoints referente a parte de autenticação
 
@@ -51,6 +58,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		clinicas.PUT("/:id", clinicaController.Atualizar)
 		clinicas.DELETE("/:id", clinicaController.Desativar)
 		clinicas.PUT("/:id/reativar", clinicaController.Reativar)
+	}
+
+	financeiro := r.Group("/financeiro", middleware.Autenticado(), verificarPermissao.VerificaPermissaoTela)
+	{
+		financeiro.GET("/abrir", financeiroController.Abrir)
 	}
 
 }
