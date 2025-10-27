@@ -24,7 +24,7 @@ func LoginHandler(authService services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		token, err := middleware.GerarToken(&usuario)
+		token, err := middleware.GerarToken(usuario)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar o token"})
 			return
