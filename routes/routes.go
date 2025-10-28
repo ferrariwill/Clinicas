@@ -72,7 +72,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		financeiro.GET("/abrir", financeiroController.Abrir)
 	}
 
-	admin := r.Group("/admin", validacaoAdm)
+	admin := r.Group("/admin", middleware.Autenticado(), validacaoAdm)
 	{
 		admin.GET("/Planos/Listar", adminController.ListarPlanos)
 		admin.POST("/Planos/Criar", adminController.CriarPlano)
