@@ -11,6 +11,8 @@ import (
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
+	validacaoAdm := middleware.AutenticadoAdmin()
+
 	//Inicialização do middleware de permissao de acesso a telas
 	planoTelaRepo := repositories.NovoPlanoTelaRepository(db)
 	planoTelaSevice := services.NovoPlanoTelaService(planoTelaRepo)
@@ -20,16 +22,21 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	usurioRepo := repositories.NovoUsuarioRepository(db)
 	clinicaRepo := repositories.NovaClinicaRepository(db)
 	tokenRepo := repositories.NovoTokenRepository(db)
+	telaRepo := repositories.NovaTelaRepository(db)
+	planoRepo := repositories.NovoPlanoRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
 	usuarioService := services.NovoUsuarioService(usurioRepo)
 	clinicaService := services.NovoClinicaService(clinicaRepo)
+	telaService := services.NovaTelaService(telaRepo)
+	planoService := services.NovoPlanoService(planoRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
 	clinicaController := controllers.NovaClinicaController(clinicaService)
 	financeiroController := controllers.NovoFinanceiroController()
+	adminController := controllers.NovoAdminController(planoService, telaService, planoTelaSevice)
 
 	//Endpoints referente a parte de autenticação
 
@@ -63,6 +70,13 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	financeiro := r.Group("/financeiro", middleware.Autenticado(), verificarPermissao.VerificaPermissaoTela)
 	{
 		financeiro.GET("/abrir", financeiroController.Abrir)
+	}
+
+	admin := r.Group("/admin", validacaoAdm)
+	{
+		admin.GET("/Planos/Listar", adminController.ListarPlanos)
+		admin.POST("/Planos/Criar", adminController.CriarPlano)
+		admin.PUT("/Planos/Associar", adminController.AssociarPlanoTela)
 	}
 
 }

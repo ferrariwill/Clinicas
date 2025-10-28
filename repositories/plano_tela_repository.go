@@ -7,6 +7,7 @@ import (
 
 type PlanoTelaRepository interface {
 	PlanoTemAcesso(planoID uint, rota string) (bool, error)
+	Criar(planoTela *models.PlanoTela) error
 }
 
 type planoTelaRepository struct {
@@ -24,4 +25,8 @@ func (r *planoTelaRepository) PlanoTemAcesso(planoID uint, rota string) (bool, e
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func (r *planoTelaRepository) Criar(planoTela *models.PlanoTela) error {
+	return r.db.Create(planoTela).Error
 }
