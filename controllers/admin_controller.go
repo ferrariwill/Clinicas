@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/ferrariwill/Clinicas/models"
+	dto "github.com/ferrariwill/Clinicas/models/DTO"
+	servicedto "github.com/ferrariwill/Clinicas/models/DTO/ServiceDTO"
 	"github.com/ferrariwill/Clinicas/services"
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +23,50 @@ func NovoAdminController(planoService services.PlanoService, telaService service
 		TelaService:      telaService,
 		PlanoTelaService: planoTelaService,
 	}
+}
+
+/*Planos*/
+func (ac AdminController) CriarPlano(c *gin.Context) {
+	var req dto.CriarPlanoDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Dados inválidos",
+		})
+		return
+	}
+
+	plano := servicedto.CriarPlanoDTO_CriarPlano(req)
+
+	planoCriado, err := ac.PlanoService.Criar(plano)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao criar o plano",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, planoCriado)
+}
+
+func (ac AdminController) ListarTelasDoPlano(c *gin.Context) {
+	planoIdStr := c.Param("id")
+	planoID, err := strconv.ParseUint(planoIdStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID do plano inválido",
+		})
+		return
+	}
+
+	telas, err := ac.PlanoTelaService.ListarTelasDoPlano(uint(planoID))
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao listar telas do plano",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, telas)
 }
 
 func (ac AdminController) ListarPlanos(c *gin.Context) {
@@ -44,25 +90,43 @@ func (ac AdminController) ListarPlanos(c *gin.Context) {
 	c.JSON(http.StatusOK, planos)
 }
 
-func (ac AdminController) CriarPlano(c *gin.Context) {
-	var plano models.Plano
-	if err := c.ShouldBindJSON(&plano); err != nil {
+/*Planos*/
+/*Telas*/
+func (ac AdminController) CriarTela(c *gin.Context) {
+	var telaDto dto.CriarTelaDTO
+	if err := c.ShouldBindJSON(&telaDto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error": "Dados inválidos",
 		})
 		return
 	}
 
-	planoCriado, err := ac.PlanoService.Criar(plano)
+	tela := servicedto.CriarTelaDTO_CriarTela(telaDto)
+
+	err := ac.TelaService.CriarTela(&tela)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
+			"error": "Erro ao cadastrar tela",
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, planoCriado)
+	c.JSON(http.StatusCreated, tela)
 }
+
+func (ac AdminController) ListarTelas(c *gin.Context) {
+	telas, err := ac.TelaService.ListarTelas()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao listar telas",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, telas)
+}
+
+/*Telas*/
 
 func (ac AdminController) AssociarPlanoTela(c *gin.Context) {
 	var planoTela models.PlanoTela

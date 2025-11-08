@@ -8,6 +8,7 @@ import (
 type PlanoTelaService interface {
 	PlanoTemAcesso(planoID uint, rota string) (bool, error)
 	Criar(planoTela *models.PlanoTela) error
+	ListarTelasDoPlano(planoID uint) ([]models.Tela, error)
 }
 
 type planoTelaService struct {
@@ -29,4 +30,8 @@ func (s *planoTelaService) PlanoTemAcesso(planoID uint, rota string) (bool, erro
 
 func (s *planoTelaService) Criar(planoTela *models.PlanoTela) error {
 	return s.repo.Criar(planoTela)
+}
+
+func (s *planoTelaService) ListarTelasDoPlano(planoID uint) ([]models.Tela, error) {
+	return s.repo.ListarTelasDoPlano(planoID)
 }

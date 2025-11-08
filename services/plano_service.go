@@ -1,8 +1,13 @@
 package services
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/ferrariwill/Clinicas/models"
 	"github.com/ferrariwill/Clinicas/repositories"
+	"github.com/ferrariwill/Clinicas/utils"
+	"gorm.io/gorm"
 )
 
 type PlanoService interface {
@@ -10,6 +15,7 @@ type PlanoService interface {
 	Atualizar(plano models.Plano) (models.Plano, error)
 	Listar(ativo *bool) ([]*models.Plano, error)
 	BuscarPorId(id int) (*models.Plano, error)
+	BuscarPorNome(nome string) (*models.Plano, error)
 	Desativar(id int) error
 	Reativar(id int) error
 }
@@ -23,7 +29,17 @@ func NovoPlanoService(repository repositories.PlanoRepository) PlanoService {
 }
 
 func (s *planoService) Criar(plano models.Plano) (models.Plano, error) {
-	plano.Ativo = true
+	nomeNormalizado := utils.NormalizarNome(plano.Nome)
+	_, err := s.BuscarPorNome(nomeNormalizado)
+
+	if err == nil {
+		return models.Plano{}, fmt.Errorf("já existe um plano com esse nome")
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.Plano{}, err
+	}
+
 	return s.repository.Criar(plano)
 }
 
@@ -37,6 +53,10 @@ func (s *planoService) Listar(ativo *bool) ([]*models.Plano, error) {
 
 func (s *planoService) BuscarPorId(id int) (*models.Plano, error) {
 	return s.repository.BuscarPorId(id)
+}
+
+func (s *planoService) BuscarPorNome(nome string) (*models.Plano, error) {
+	return s.repository.BuscarPorNome(nome)
 }
 
 func (s *planoService) Desativar(id int) error {

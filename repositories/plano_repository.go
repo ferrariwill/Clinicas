@@ -10,6 +10,7 @@ type PlanoRepository interface {
 	Atualizar(plano models.Plano) (models.Plano, error)
 	Listar(ativo *bool) ([]*models.Plano, error)
 	BuscarPorId(id int) (*models.Plano, error)
+	BuscarPorNome(nome string) (*models.Plano, error)
 	Desativar(id int) error
 	Reativar(id int) error
 }
@@ -55,4 +56,10 @@ func (r *planoRepository) Desativar(id int) error {
 
 func (r *planoRepository) Reativar(id int) error {
 	return r.db.Model(&models.Plano{}).Where("id = ?", id).Update("ativo", true).Error
+}
+
+func (r *planoRepository) BuscarPorNome(nome string) (*models.Plano, error) {
+	var plano models.Plano
+	err := r.db.Where("nome = ?", nome).First(&plano).Error
+	return &plano, err
 }

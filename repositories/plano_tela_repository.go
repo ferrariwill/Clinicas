@@ -8,6 +8,7 @@ import (
 type PlanoTelaRepository interface {
 	PlanoTemAcesso(planoID uint, rota string) (bool, error)
 	Criar(planoTela *models.PlanoTela) error
+	ListarTelasDoPlano(planoID uint) ([]models.Tela, error)
 }
 
 type planoTelaRepository struct {
@@ -29,4 +30,13 @@ func (r *planoTelaRepository) PlanoTemAcesso(planoID uint, rota string) (bool, e
 
 func (r *planoTelaRepository) Criar(planoTela *models.PlanoTela) error {
 	return r.db.Create(planoTela).Error
+}
+
+func (r *planoTelaRepository) ListarTelasDoPlano(planoID uint) ([]models.Tela, error) {
+	var telas []models.Tela
+	err := r.db.Table("telas").
+		Joins("JOIN plano_telas ON telas.id = plano_telas.tela_id").
+		Where("plano_telas.plano_id = ?", planoID).
+		Find(&telas).Error
+	return telas, err
 }
