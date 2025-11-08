@@ -24,6 +24,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	tokenRepo := repositories.NovoTokenRepository(db)
 	telaRepo := repositories.NovaTelaRepository(db)
 	planoRepo := repositories.NovoPlanoRepository(db)
+	assinaturaRepo := repositories.NovaAssinaturaRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -31,12 +32,16 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	clinicaService := services.NovoClinicaService(clinicaRepo)
 	telaService := services.NovaTelaService(telaRepo)
 	planoService := services.NovoPlanoService(planoRepo)
+	assinaturaService := services.NovaAssinaturaService(assinaturaRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
 	clinicaController := controllers.NovaClinicaController(clinicaService)
 	financeiroController := controllers.NovoFinanceiroController()
-	adminController := controllers.NovoAdminController(planoService, telaService, planoTelaSevice)
+	adminController := controllers.NovoAdminController(planoService,
+		telaService,
+		planoTelaSevice,
+		assinaturaService)
 
 	//Endpoints referente a parte de autenticação
 
@@ -74,13 +79,22 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 	admin := r.Group("/admin", middleware.Autenticado(), validacaoAdm)
 	{
+		//Assinaturas
+		admin.POST("/assinaturas", adminController.CriarAssinatura)
+		admin.GET("/assinaturas", adminController.ListarAssinaturas)
+		admin.GET("/clinicas/:id/assinatura", adminController.ConsultarAssinaturaClinica)
+		//Telas
 		admin.POST("/telas", adminController.CriarTela)
 		admin.GET("/telas", adminController.ListarTelas)
 
-		admin.GET("/planos/:id/telas", adminController.ListarTelasDoPlano)
+		//Planos
 		admin.GET("/planos/Listar", adminController.ListarPlanos)
 		admin.POST("/planos/Criar", adminController.CriarPlano)
 		admin.PUT("/planos/Associar", adminController.AssociarPlanoTela)
+
+		//Plano e telas
+		admin.GET("/planos/:id/telas", adminController.ListarTelasDoPlano)
+		admin.DELETE("/planos/:id/telas/:tela_id", adminController.RemoverTelaDoPlano)
 
 	}
 

@@ -9,6 +9,7 @@ type PlanoTelaRepository interface {
 	PlanoTemAcesso(planoID uint, rota string) (bool, error)
 	Criar(planoTela *models.PlanoTela) error
 	ListarTelasDoPlano(planoID uint) ([]models.Tela, error)
+	RemoverTelaDoPlano(planoID, telaID uint) error
 }
 
 type planoTelaRepository struct {
@@ -39,4 +40,9 @@ func (r *planoTelaRepository) ListarTelasDoPlano(planoID uint) ([]models.Tela, e
 		Where("plano_telas.plano_id = ?", planoID).
 		Find(&telas).Error
 	return telas, err
+}
+
+func (r *planoTelaRepository) RemoverTelaDoPlano(planoID, telaID uint) error {
+	return r.db.Where("plano_id = ? AND tela_id = ?", planoID, telaID).
+		Delete(&models.PlanoTela{}).Error
 }
