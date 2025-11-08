@@ -7,7 +7,7 @@ import (
 
 type PlanoRepository interface {
 	Criar(plano models.Plano) (models.Plano, error)
-	Atualizar(plano models.Plano) (models.Plano, error)
+	Atualizar(id uint, plano models.Plano) (models.Plano, error)
 	Listar(ativo *bool) ([]*models.Plano, error)
 	BuscarPorId(id int) (*models.Plano, error)
 	BuscarPorNome(nome string) (*models.Plano, error)
@@ -28,7 +28,8 @@ func (r *planoRepository) Criar(plano models.Plano) (models.Plano, error) {
 	return plano, err
 }
 
-func (r *planoRepository) Atualizar(plano models.Plano) (models.Plano, error) {
+func (r *planoRepository) Atualizar(id uint, plano models.Plano) (models.Plano, error) {
+	plano.ID = id
 	err := r.db.Save(&plano).Error
 	return plano, err
 }

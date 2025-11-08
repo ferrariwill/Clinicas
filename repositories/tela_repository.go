@@ -11,7 +11,8 @@ type TelaRepository interface {
 	ListarTelas() ([]*models.Tela, error)
 	ListarTelasPorAssinatura(assinaturaID int) ([]*models.Tela, error)
 	AtualizarTela(t *models.Tela) error
-	DeletarTela(id int) error
+	Desativar(id int) error
+	Reativar(id int) error
 }
 
 type telaRepository struct {
@@ -42,7 +43,7 @@ func (r *telaRepository) ListarTelasPorAssinatura(assinaturaID int) ([]*models.T
 	var telas []*models.Tela
 	err := r.db.Table("telas").
 		Joins("JOIN tela_assinaturas ON telas.id = tela_assinaturas.tela_id").
-		Where("tela_assinaturas.assinatura_id = ?", assinaturaID).
+		Where("tela_assinaturas.assinatura_id = ? AND tela.Ativo = true", assinaturaID).
 		Find(&telas).Error
 	return telas, err
 }
@@ -51,6 +52,12 @@ func (r *telaRepository) AtualizarTela(t *models.Tela) error {
 	return r.db.Save(t).Error
 }
 
-func (r *telaRepository) DeletarTela(id int) error {
-	return r.db.Delete(&models.Tela{}, id).Error
+func (r *telaRepository) Desativar(id int) error {
+	// Lógica para marcar como inativo ao invés de deletar
+	return r.db.Model(&models.Tela{}).Where("id = ?", id).Update("Ativo", false).Error
+}
+
+func (r *telaRepository) Reativar(id int) error {
+	// Lógica para reativar
+	return r.db.Model(&models.Tela{}).Where("id = ?", id).Update("Ativo", true).Error
 }

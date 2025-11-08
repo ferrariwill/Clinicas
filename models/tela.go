@@ -7,6 +7,7 @@ type Tela struct {
 	Nome      string `json:"nome"`
 	Rota      string `json:"rota"`
 	Descricao string `json:"descricao"`
+	Ativo     bool   `json:"ativo"`
 
 	Planos []Plano `gorm:"foreignKey:TelaID;constraint:OnDelete:CASCADE`
 }

@@ -133,3 +133,18 @@ func (uc *UsuarioController) Ativar(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Usuário ativado com sucesso"})
 }
+
+func (uc *UsuarioController) ListarTodos(c *gin.Context) {
+	var filtro *bool
+	if param := c.Query("ativos"); param != "" {
+		ativo := param == "true"
+		filtro = &ativo
+	}
+	usuarios, err := uc.usuarioService.Listar(filtro)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao consultar usuarios"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"usuarios": usuarios})
+}

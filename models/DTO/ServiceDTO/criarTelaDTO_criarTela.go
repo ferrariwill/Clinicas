@@ -10,6 +10,7 @@ func CriarTelaDTO_CriarTela(dto dto.CriarTelaDTO) models.Tela {
 		Nome:      dto.Nome,
 		Rota:      dto.Rota,
 		Descricao: dto.Descricao,
+		Ativo:     true,
 	}
 
 	return tela

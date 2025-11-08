@@ -12,7 +12,7 @@ import (
 
 type PlanoService interface {
 	Criar(plano models.Plano) (models.Plano, error)
-	Atualizar(plano models.Plano) (models.Plano, error)
+	Atualizar(id uint, plano models.Plano) (models.Plano, error)
 	Listar(ativo *bool) ([]*models.Plano, error)
 	BuscarPorId(id int) (*models.Plano, error)
 	BuscarPorNome(nome string) (*models.Plano, error)
@@ -43,8 +43,8 @@ func (s *planoService) Criar(plano models.Plano) (models.Plano, error) {
 	return s.repository.Criar(plano)
 }
 
-func (s *planoService) Atualizar(plano models.Plano) (models.Plano, error) {
-	return s.repository.Atualizar(plano)
+func (s *planoService) Atualizar(id uint, plano models.Plano) (models.Plano, error) {
+	return s.repository.Atualizar(id, plano)
 }
 
 func (s *planoService) Listar(ativo *bool) ([]*models.Plano, error) {

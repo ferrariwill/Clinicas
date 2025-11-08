@@ -83,19 +83,31 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		admin.POST("/assinaturas", adminController.CriarAssinatura)
 		admin.GET("/assinaturas", adminController.ListarAssinaturas)
 		admin.GET("/clinicas/:id/assinatura", adminController.ConsultarAssinaturaClinica)
+
 		//Telas
 		admin.POST("/telas", adminController.CriarTela)
 		admin.GET("/telas", adminController.ListarTelas)
+		admin.PUT("/telas/:id", adminController.AtualizarTela)
+		admin.DELETE("/telas/:id", adminController.DesativarTela)
+		admin.PUT("/telas/:id/reativar", adminController.ReativarTela)
 
 		//Planos
 		admin.GET("/planos/Listar", adminController.ListarPlanos)
 		admin.POST("/planos/Criar", adminController.CriarPlano)
 		admin.PUT("/planos/Associar", adminController.AssociarPlanoTela)
+		admin.PUT("/planos/:id", adminController.AtualizarPlano)
+		admin.DELETE("/planos/:id", adminController.DesativarPlano)
+		admin.PUT("/planos/:id/reativar", adminController.ReativarPlano)
 
 		//Plano e telas
 		admin.GET("/planos/:id/telas", adminController.ListarTelasDoPlano)
 		admin.DELETE("/planos/:id/telas/:tela_id", adminController.RemoverTelaDoPlano)
 
+		//Usuarios
+		admin.GET("/usuarios", usuarioController.ListarTodos)
+
+		//Clinicas
+		admin.GET("/clinicas", clinicaController.Listar)
 	}
 
 }

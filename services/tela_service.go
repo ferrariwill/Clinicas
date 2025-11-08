@@ -11,7 +11,8 @@ type TelaService interface {
 	ListarTelas() ([]*models.Tela, error)
 	ListarTelasPorAssinatura(assinaturaID int) ([]*models.Tela, error)
 	AtualizarTela(t *models.Tela) error
-	DeletarTela(id int) error
+	Reativar(id int) error
+	Desativar(id int) error
 }
 
 type telaService struct {
@@ -43,6 +44,10 @@ func (s *telaService) AtualizarTela(t *models.Tela) error {
 	return s.telaRepository.AtualizarTela(t)
 }
 
-func (s *telaService) DeletarTela(id int) error {
-	return s.telaRepository.DeletarTela(id)
+func (s *telaService) Desativar(id int) error {
+	return s.telaRepository.Desativar(id)
+}
+
+func (s *telaService) Reativar(id int) error {
+	return s.telaRepository.Reativar(id)
 }

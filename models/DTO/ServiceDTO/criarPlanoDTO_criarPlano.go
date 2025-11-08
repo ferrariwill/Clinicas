@@ -11,7 +11,7 @@ func CriarPlanoDTO_CriarPlano(dto dto.CriarPlanoDTO) models.Plano {
 		Descricao:      dto.Descricao,
 		ValorMensal:    dto.Valor,
 		LimiteUsuarios: dto.LimiteUsuarios,
-		Ativo:          dto.Ativo,
+		Ativo:          true,
 	}
 	return plano
 }

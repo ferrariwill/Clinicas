@@ -119,6 +119,37 @@ func (ac AdminController) CriarPlano(c *gin.Context) {
 	c.JSON(http.StatusCreated, planoCriado)
 }
 
+func (ac AdminController) AtualizarPlano(c *gin.Context) {
+	planoIdStr := c.Param("id")
+	planoID, err := strconv.ParseUint(planoIdStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID do plano inválido",
+		})
+		return
+	}
+
+	var req dto.CriarPlanoDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Dados inválidos",
+		})
+		return
+	}
+
+	plano := servicedto.CriarPlanoDTO_CriarPlano(req)
+
+	planoAtualizado, err := ac.PlanoService.Atualizar(uint(planoID), plano)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao atualizar o plano",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, planoAtualizado)
+}
+
 func (ac AdminController) ListarTelasDoPlano(c *gin.Context) {
 	planoIdStr := c.Param("id")
 	planoID, err := strconv.ParseUint(planoIdStr, 10, 64)
@@ -161,6 +192,52 @@ func (ac AdminController) ListarPlanos(c *gin.Context) {
 	c.JSON(http.StatusOK, planos)
 }
 
+func (ac AdminController) DesativarPlano(c *gin.Context) {
+	planoIdStr := c.Param("id")
+	planoID, err := strconv.Atoi(planoIdStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID do plano inválido",
+		})
+		return
+	}
+
+	err = ac.PlanoService.Desativar(planoID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao desativar o plano",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"messagem": "Plano desativado com sucesso",
+	})
+}
+
+func (ac AdminController) ReativarPlano(c *gin.Context) {
+	planoIdStr := c.Param("id")
+	planoID, err := strconv.Atoi(planoIdStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID do plano inválido",
+		})
+		return
+	}
+
+	err = ac.PlanoService.Reativar(planoID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao ativar o plano",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"messagem": "Plano reativado com sucesso",
+	})
+}
+
 /*Planos*/
 /*Telas*/
 func (ac AdminController) CriarTela(c *gin.Context) {
@@ -185,6 +262,37 @@ func (ac AdminController) CriarTela(c *gin.Context) {
 	c.JSON(http.StatusCreated, tela)
 }
 
+func (ac AdminController) AtualizarTela(c *gin.Context) {
+	telaIDStr := c.Param("id")
+	telaID, err := strconv.Atoi(telaIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID da tela inválido",
+		})
+		return
+	}
+
+	var telaDto dto.CriarTelaDTO
+	if err := c.ShouldBindJSON(&telaDto); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Dados inválidos",
+		})
+		return
+	}
+
+	tela := servicedto.CriarTelaDTO_CriarTela(telaDto)
+	tela.ID = uint(telaID)
+	err = ac.TelaService.AtualizarTela(&tela)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao atualizar tela",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, tela)
+}
+
 func (ac AdminController) ListarTelas(c *gin.Context) {
 	telas, err := ac.TelaService.ListarTelas()
 	if err != nil {
@@ -195,6 +303,52 @@ func (ac AdminController) ListarTelas(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, telas)
+}
+
+func (ac AdminController) DesativarTela(c *gin.Context) {
+	telaIDStr := c.Param("id")
+	telaID, err := strconv.Atoi(telaIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID da tela inválido",
+		})
+		return
+	}
+
+	err = ac.TelaService.Desativar(telaID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao consultar tela",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"mensagem": "Tela desativada com sucesso",
+	})
+}
+
+func (ac AdminController) ReativarTela(c *gin.Context) {
+	telaIDStr := c.Param("id")
+	telaID, err := strconv.Atoi(telaIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID da tela inválido",
+		})
+		return
+	}
+
+	err = ac.TelaService.Reativar(telaID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Erro ao consultar tela",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"mensagem": "Tela ativada com sucesso",
+	})
 }
 
 /*Telas*/

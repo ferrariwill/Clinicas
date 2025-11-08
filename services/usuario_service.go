@@ -9,6 +9,7 @@ import (
 type UsuarioService interface {
 	CriarUsuario(u *models.Usuario, clinicaId uint) error
 	ListarPorClinica(clinicaId uint, soAtivos *bool) ([]models.Usuario, error)
+	Listar(ativo *bool) ([]models.Usuario, error)
 	BuscarPorID(id uint) (*models.Usuario, error)
 	AtualizarUsuario(u *models.Usuario) error
 	DesativarUsuario(id uint) error
@@ -49,4 +50,8 @@ func (s *usuarioService) DesativarUsuario(id uint) error {
 
 func (s *usuarioService) ReativarUsuario(id uint) error {
 	return s.repo.ReativarUsuario(id)
+}
+
+func (s *usuarioService) Listar(ativo *bool) ([]models.Usuario, error) {
+	return s.repo.ListarUsuarios(ativo)
 }
