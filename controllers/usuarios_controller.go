@@ -6,6 +6,7 @@ import (
 
 	"github.com/ferrariwill/Clinicas/middleware"
 	"github.com/ferrariwill/Clinicas/models"
+	dto "github.com/ferrariwill/Clinicas/models/DTO"
 	"github.com/ferrariwill/Clinicas/services"
 	"github.com/gin-gonic/gin"
 )
@@ -147,4 +148,26 @@ func (uc *UsuarioController) ListarTodos(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"usuarios": usuarios})
+}
+
+func (uc *UsuarioController) CriarUsuarioClinica(c *gin.Context) {
+	var dto dto.CriarUsuarioClinicaDTO
+	if err := c.ShouldBindJSON(&dto); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+
+	usuarioClinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Erro ao extrair clinica_id do token"})
+		return
+	}
+
+	usuario, err := uc.usuarioService.CriarUsuarioClinica(dto, usuarioClinicaID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar usuário"})
+		return
+	}
+	usuario.Senha = ""
+	c.JSON(http.StatusCreated, usuario)
 }

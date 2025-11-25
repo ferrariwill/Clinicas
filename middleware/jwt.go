@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ferrariwill/Clinicas/models"
@@ -23,16 +25,53 @@ func GerarToken(usuario *models.Usuario) (string, error) {
 }
 
 func ExtrairDoToken[T any](c *gin.Context, chave string) (T, error) {
-	valor, existe := c.Get(chave)
-	if !existe {
-		var vazio T
-		return vazio, nil
+	var vazio T
+
+	// Pega o token do header
+	tokenString := c.GetHeader("Authorization")
+	if tokenString == "" {
+		return vazio, fmt.Errorf("token não fornecido")
 	}
 
-	convertido, ok := valor.(T)
-	if !ok {
-		var vazio T
-		return vazio, nil
+	// Remove "Bearer " se existir
+	if strings.HasPrefix(tokenString, "Bearer ") {
+		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 	}
-	return convertido, nil
+
+	// Faz o parse do token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+	if err != nil || !token.Valid {
+		return vazio, fmt.Errorf("token inválido")
+	}
+
+	// Extrai os claims
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if valor, existe := claims[chave]; existe {
+			// Tentar converter para o tipo genérico
+			convertido, ok := valor.(T)
+			if ok {
+				return convertido, nil
+			}
+			// Tratamento especial: números vêm como float64
+			switch any(vazio).(type) {
+			case int:
+				if num, ok := valor.(float64); ok {
+					return any(int(num)).(T), nil
+				}
+			case int64:
+				if num, ok := valor.(float64); ok {
+					return any(int64(num)).(T), nil
+				}
+			case string:
+				if str, ok := valor.(string); ok {
+					return any(str).(T), nil
+				}
+			}
+			return vazio, fmt.Errorf("não foi possível converter o claim %s", chave)
+		}
+	}
+
+	return vazio, fmt.Errorf("claim %s não encontrado", chave)
 }

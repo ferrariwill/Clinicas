@@ -1,0 +1,118 @@
+openapi: 3.0.0
+info:
+  title: API Clínicas
+  description: API para gestão de clínicas, procedimentos e agendamentos
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Servidor local de desenvolvimento
+
+paths:
+  /login:
+    post:
+      summary: Login de usuário
+      description: Retorna um token JWT para autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                senha:
+                  type: string
+      responses:
+        '200':
+          description: Token JWT gerado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  /clinicas:
+    get:
+      summary: Listar clínicas
+      responses:
+        '200':
+          description: Lista de clínicas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Clinica'
+    post:
+      summary: Criar clínica
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Clinica'
+      responses:
+        '201':
+          description: Clínica criada
+
+  /clinicas/{id}:
+    get:
+      summary: Buscar clínica por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Clínica encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Clinica'
+    put:
+      summary: Atualizar clínica
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Clinica'
+      responses:
+        '200':
+          description: Clínica atualizada
+    delete:
+      summary: Deletar clínica
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Clínica removida
+
+components:
+  schemas:
+    Clinica:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        endereco:
+          type: string
+        telefone:
+          type: string

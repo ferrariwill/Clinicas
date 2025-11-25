@@ -70,6 +70,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		clinicas.PUT("/:id", clinicaController.Atualizar)
 		clinicas.DELETE("/:id", clinicaController.Desativar)
 		clinicas.PUT("/:id/reativar", clinicaController.Reativar)
+
+		//Usuarios
+		clinicas.POST("/usuarios", usuarioController.CriarUsuarioClinica)
 	}
 
 	financeiro := r.Group("/financeiro", middleware.Autenticado(), verificarPermissao.VerificaPermissaoTela)

@@ -19,8 +19,8 @@ func NovaVerificacaoTelaMiddleware(service services.PlanoTelaService) VerificaPe
 
 func (m *VerificaPermissaoTelaMiddleware) VerificaPermissaoTela(c *gin.Context) {
 	rota := c.FullPath()
-	planoIdInterface, existe := c.Get("plano_id")
-	if !existe {
+	planoIdInterface, err := ExtrairDoToken[uint](c, "plano_id")
+	if err != nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 			"mensagem": "Plano não encontrado",
 		})
@@ -28,16 +28,7 @@ func (m *VerificaPermissaoTelaMiddleware) VerificaPermissaoTela(c *gin.Context) 
 		return
 	}
 
-	planoID, ok := planoIdInterface.(uint)
-	if !ok {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"mensagem": "Plano não encontrado",
-		})
-		c.Abort()
-		return
-	}
-
-	temAcesso, err := m.PlanoTelaService.PlanoTemAcesso(planoID, rota)
+	temAcesso, err := m.PlanoTelaService.PlanoTemAcesso(planoIdInterface, rota)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 			"mensagem": "Erro ao verificar permissão",

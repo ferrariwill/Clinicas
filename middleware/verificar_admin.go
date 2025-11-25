@@ -8,20 +8,15 @@ import (
 
 func AutenticadoAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tipoUsuarioInterface, existe := c.Get("tipo_usuario_id")
-		if !existe {
-			c.JSON(http.StatusUnauthorized, gin.H{"erro": "Token inválido"})
-			c.Abort()
+		tipoUsuarioID, err := ExtrairDoToken[int](c, "tipo_usuario_id")
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
 			return
 		}
-
-		tipoUsuarioID, ok := tipoUsuarioInterface.(uint)
-		if !ok || tipoUsuarioID != 1 {
-			c.JSON(http.StatusForbidden, gin.H{"erro": "Acesso restrito ao administrador do sistema"})
-			c.Abort()
+		if tipoUsuarioID != 1 {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Acesso negado"})
 			return
 		}
-
 		c.Next()
 	}
 }
