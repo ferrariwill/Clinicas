@@ -25,6 +25,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	telaRepo := repositories.NovaTelaRepository(db)
 	planoRepo := repositories.NovoPlanoRepository(db)
 	assinaturaRepo := repositories.NovaAssinaturaRepository(db)
+	procedimentoRepo := repositories.NovoProcedimentoRepository(db)
+	convenioRepo := repositories.NovoConvenioRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -33,10 +35,14 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	telaService := services.NovaTelaService(telaRepo)
 	planoService := services.NovoPlanoService(planoRepo)
 	assinaturaService := services.NovaAssinaturaService(assinaturaRepo)
+	procedimentoService := services.NovoProcedimentoService(procedimentoRepo, convenioRepo)
+	convenioService := services.NovoConvenioService(convenioRepo, procedimentoRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
 	clinicaController := controllers.NovaClinicaController(clinicaService)
+	procedimentoController := controllers.NovoProcedimentoController(procedimentoService)
+	convenioController := controllers.NovoConvenioCoontroller(convenioService)
 	financeiroController := controllers.NovoFinanceiroController()
 	adminController := controllers.NovoAdminController(planoService,
 		telaService,
@@ -73,6 +79,28 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		//Usuarios
 		clinicas.POST("/usuarios", usuarioController.CriarUsuarioClinica)
+	}
+
+	convenios := r.Group("/convenios", middleware.Autenticado())
+	{
+		convenios.POST("", convenioController.Cadastrar)
+		convenios.PUT("/:id", convenioController.Atualizar)
+		convenios.GET("", convenioController.BuscarConvenio)
+		convenios.DELETE("/:id", convenioController.Desativar)
+		convenios.PUT("/:id/reativar", convenioController.Reativar)
+
+		convenios.POST("/procedimento", convenioController.CadastrarProcedimento)
+		convenios.PUT("/procedimento/:id", convenioController.AtualizarProcedimento)
+		convenios.GET("/:id/procedimento", convenioController.BuscarProcedimentos)
+	}
+
+	procedimento := r.Group("/procedimentos", middleware.Autenticado())
+	{
+		procedimento.POST("", procedimentoController.Cadastrar)
+		procedimento.PUT("/:id", procedimentoController.Atualizar)
+		procedimento.GET("", procedimentoController.BuscarPorClinica)
+		procedimento.DELETE("/:id", procedimentoController.Desativar)
+		procedimento.PUT("/:id/reativar", procedimentoController.Reativar)
 	}
 
 	financeiro := r.Group("/financeiro", middleware.Autenticado(), verificarPermissao.VerificaPermissaoTela)
