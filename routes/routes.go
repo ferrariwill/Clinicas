@@ -28,6 +28,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	procedimentoRepo := repositories.NovoProcedimentoRepository(db)
 	convenioRepo := repositories.NovoConvenioRepository(db)
 	pacienteRepo := repositories.NovoPacienteRepository(db)
+	agendaRepo := repositories.NovaAgendaRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -39,6 +40,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	procedimentoService := services.NovoProcedimentoService(procedimentoRepo, convenioRepo)
 	convenioService := services.NovoConvenioService(convenioRepo, procedimentoRepo)
 	pacienteService := services.NovoPacienteService(pacienteRepo)
+	agendaService := services.NovaAgendaService(agendaRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
@@ -46,6 +48,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	procedimentoController := controllers.NovoProcedimentoController(procedimentoService)
 	convenioController := controllers.NovoConvenioCoontroller(convenioService)
 	pacienteController := controllers.NovoPacienteController(pacienteService)
+	agendaController := controllers.NovaAgendaController(agendaService)
 	financeiroController := controllers.NovoFinanceiroController()
 	adminController := controllers.NovoAdminController(planoService,
 		telaService,
@@ -93,6 +96,13 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		//Usuarios
 		clinicas.POST("/usuarios", usuarioController.CriarUsuarioClinica)
+
+		//Agendamentos
+		clinicas.POST("/agenda", agendaController.Criar)
+		clinicas.GET("/agenda", agendaController.Listar)
+		clinicas.PUT("/agenda/:id/status", agendaController.AtualizarStatus)
+		clinicas.GET("/agenda/horarios-disponiveis", agendaController.HorariosDisponiveis)
+
 	}
 
 	convenios := r.Group("/convenios", middleware.Autenticado())
