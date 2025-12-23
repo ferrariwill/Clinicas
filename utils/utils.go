@@ -14,6 +14,9 @@ func NormalizarEmail(email string) string {
 }
 
 func StringParaUint(s string) (uint, error) {
+	if s == "" {
+		return 0, nil
+	}
 	u64, err := strconv.ParseUint(s, 10, 64)
 	return uint(u64), err
 }
