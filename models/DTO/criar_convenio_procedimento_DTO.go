@@ -1,4 +1,4 @@
-package dto
+package DTO
 
 type ConvenioProcedimentoDTO struct {
 	ConvenioID     uint    `json:"convenio_id"`

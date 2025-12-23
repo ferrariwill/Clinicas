@@ -1,4 +1,4 @@
-package dto
+package DTO
 
 type CriarTelaDTO struct {
 	Nome      string `json:"nome" validate:"required"`

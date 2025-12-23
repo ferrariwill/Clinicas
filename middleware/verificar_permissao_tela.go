@@ -3,15 +3,14 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/ferrariwill/Clinicas/services"
 	"github.com/gin-gonic/gin"
 )
 
 type VerificaPermissaoTelaMiddleware struct {
-	PlanoTelaService services.PlanoTelaService
+	PlanoTelaService PlanoTelaChecker
 }
 
-func NovaVerificacaoTelaMiddleware(service services.PlanoTelaService) VerificaPermissaoTelaMiddleware {
+func NovaVerificacaoTelaMiddleware(service PlanoTelaChecker) VerificaPermissaoTelaMiddleware {
 	return VerificaPermissaoTelaMiddleware{
 		PlanoTelaService: service,
 	}

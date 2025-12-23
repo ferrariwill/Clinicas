@@ -1,4 +1,4 @@
-package dto
+package DTO
 
 type CriarConvenioDTO struct {
 	Nome  string `json:"nome" binding:"required"`

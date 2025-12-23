@@ -1,4 +1,4 @@
-package dto
+package DTO
 
 type CriarProcedimentoDTO struct {
 	Nome       string  `json:"nome"`

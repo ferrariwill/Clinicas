@@ -33,8 +33,8 @@ func NovaAgendaController(service services.AgendaService) *AgendaController {
 // @Security BearerAuth
 // @Router /clinicas/agenda [post]
 func (ac AgendaController) Criar(c *gin.Context) {
-	var dto dto.CriarAgendaDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+	var agendaDTO dto.CriarAgendaDTO
+	if err := c.ShouldBindJSON(&agendaDTO); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
 		return
 	}
@@ -45,7 +45,7 @@ func (ac AgendaController) Criar(c *gin.Context) {
 		return
 	}
 
-	agendamento := servicedto.CriarAgendaDTO_CriarAgenda(dto, clinicaID)
+	agendamento := servicedto.CriarAgendaDTO_CriarAgenda(agendaDTO, clinicaID)
 	agenda, err := ac.service.Criar(agendamento)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

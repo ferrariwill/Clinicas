@@ -6,16 +6,21 @@ import (
 
 	"github.com/ferrariwill/Clinicas/middleware"
 	"github.com/ferrariwill/Clinicas/models"
+	dto "github.com/ferrariwill/Clinicas/models/DTO"
 	"github.com/ferrariwill/Clinicas/services"
 	"github.com/gin-gonic/gin"
 )
 
 type ClinicaController struct {
-	service services.ClinicaService
+	service           services.ClinicaService
+	configService     services.ConfiguracaoService
 }
 
-func NovaClinicaController(s services.ClinicaService) *ClinicaController {
-	return &ClinicaController{service: s}
+func NovaClinicaController(s services.ClinicaService, configService services.ConfiguracaoService) *ClinicaController {
+	return &ClinicaController{
+		service:       s,
+		configService: configService,
+	}
 }
 
 // @Summary Criar clínica
@@ -125,4 +130,81 @@ func (cc *ClinicaController) Reativar(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"mensagem": "Clínica reativada com sucesso"})
+}
+
+// @Summary Buscar configurações da clínica
+// @Description Retorna as configurações da clínica
+// @Tags Clínicas
+// @Accept json
+// @Produce json
+// @Param id path int true "ID da clínica"
+// @Success 200 {object} ConfiguracaoResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /clinicas/{id}/configuracoes [get]
+func (cc *ClinicaController) BuscarConfiguracoes(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	
+	// Verificar se usuário tem acesso à clínica
+	usuarioClinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
+		return
+	}
+	
+	if usuarioClinicaID != uint(id) {
+		c.JSON(http.StatusForbidden, gin.H{"erro": "Acesso negado"})
+		return
+	}
+	
+	config, err := cc.configService.BuscarConfiguracao(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, config)
+}
+
+// @Summary Atualizar configurações da clínica
+// @Description Atualiza as configurações da clínica
+// @Tags Clínicas
+// @Accept json
+// @Produce json
+// @Param id path int true "ID da clínica"
+// @Param configuracao body ConfiguracaoRequest true "Dados da configuração"
+// @Success 200 {object} ConfiguracaoResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /clinicas/{id}/configuracoes [put]
+func (cc *ClinicaController) AtualizarConfiguracoes(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	
+	// Verificar se usuário tem acesso à clínica
+	usuarioClinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
+		return
+	}
+	
+	if usuarioClinicaID != uint(id) {
+		c.JSON(http.StatusForbidden, gin.H{"erro": "Acesso negado"})
+		return
+	}
+	
+	var req dto.ConfiguracaoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "Dados inválidos"})
+		return
+	}
+	
+	config, err := cc.configService.AtualizarConfiguracao(uint(id), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, config)
 }

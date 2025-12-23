@@ -163,6 +163,102 @@ definitions:
         example: (11) 99999-9999
         type: string
     type: object
+  controllers.ConfiguracaoRequest:
+    properties:
+      email_notificacao:
+        example: contato@clinica.com
+        type: string
+      funciona_domingo:
+        example: false
+        type: boolean
+      horario_fim_domingo:
+        example: ""
+        type: string
+      horario_fim_sabado:
+        example: "12:00"
+        type: string
+      horario_fim_semana:
+        example: "18:00"
+        type: string
+      horario_inicio_domingo:
+        example: ""
+        type: string
+      horario_inicio_sabado:
+        example: "08:00"
+        type: string
+      horario_inicio_semana:
+        example: "08:00"
+        type: string
+      intervalo_consulta:
+        example: 30
+        type: integer
+      limite_agendamentos_dia:
+        example: 50
+        type: integer
+      mensagem_boas_vindas:
+        example: Bem-vindo à nossa clínica!
+        type: string
+      permite_agendamento_fds:
+        example: false
+        type: boolean
+      telefone_whatsapp:
+        example: "11999999999"
+        type: string
+      tempo_antecedencia:
+        example: 24
+        type: integer
+    type: object
+  controllers.ConfiguracaoResponse:
+    properties:
+      clinica_id:
+        example: 1
+        type: integer
+      email_notificacao:
+        example: contato@clinica.com
+        type: string
+      funciona_domingo:
+        example: false
+        type: boolean
+      horario_fim_domingo:
+        example: ""
+        type: string
+      horario_fim_sabado:
+        example: "12:00"
+        type: string
+      horario_fim_semana:
+        example: "18:00"
+        type: string
+      horario_inicio_domingo:
+        example: ""
+        type: string
+      horario_inicio_sabado:
+        example: "08:00"
+        type: string
+      horario_inicio_semana:
+        example: "08:00"
+        type: string
+      id:
+        example: 1
+        type: integer
+      intervalo_consulta:
+        example: 30
+        type: integer
+      limite_agendamentos_dia:
+        example: 50
+        type: integer
+      mensagem_boas_vindas:
+        example: Bem-vindo à nossa clínica!
+        type: string
+      permite_agendamento_fds:
+        example: false
+        type: boolean
+      telefone_whatsapp:
+        example: "11999999999"
+        type: string
+      tempo_antecedencia:
+        example: 24
+        type: integer
+    type: object
   controllers.DashboardResponse:
     properties:
       agendamentos_hoje:
@@ -602,6 +698,73 @@ paths:
       security:
       - BearerAuth: []
       summary: Criar clínica
+      tags:
+      - Clínicas
+  /clinicas/{id}/configuracoes:
+    get:
+      consumes:
+      - application/json
+      description: Retorna as configurações da clínica
+      parameters:
+      - description: ID da clínica
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.ConfiguracaoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Buscar configurações da clínica
+      tags:
+      - Clínicas
+    put:
+      consumes:
+      - application/json
+      description: Atualiza as configurações da clínica
+      parameters:
+      - description: ID da clínica
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dados da configuração
+        in: body
+        name: configuracao
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.ConfiguracaoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.ConfiguracaoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Atualizar configurações da clínica
       tags:
       - Clínicas
   /clinicas/agenda:

@@ -1,4 +1,4 @@
-package dto
+package DTO
 
 // DashboardResponse representa o dashboard principal
 type DashboardResponse struct {

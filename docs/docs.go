@@ -417,6 +417,111 @@ const docTemplate = `{
                 }
             }
         },
+        "/clinicas/{id}/configuracoes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retorna as configurações da clínica",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Clínicas"
+                ],
+                "summary": "Buscar configurações da clínica",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID da clínica",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ConfiguracaoResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Atualiza as configurações da clínica",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Clínicas"
+                ],
+                "summary": "Atualizar configurações da clínica",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID da clínica",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Dados da configuração",
+                        "name": "configuracao",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ConfiguracaoRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ConfiguracaoResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/dashboard": {
             "get": {
                 "security": [
@@ -1315,6 +1420,136 @@ const docTemplate = `{
                 "telefone": {
                     "type": "string",
                     "example": "(11) 99999-9999"
+                }
+            }
+        },
+        "controllers.ConfiguracaoRequest": {
+            "type": "object",
+            "properties": {
+                "email_notificacao": {
+                    "type": "string",
+                    "example": "contato@clinica.com"
+                },
+                "funciona_domingo": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "horario_fim_domingo": {
+                    "type": "string",
+                    "example": ""
+                },
+                "horario_fim_sabado": {
+                    "type": "string",
+                    "example": "12:00"
+                },
+                "horario_fim_semana": {
+                    "type": "string",
+                    "example": "18:00"
+                },
+                "horario_inicio_domingo": {
+                    "type": "string",
+                    "example": ""
+                },
+                "horario_inicio_sabado": {
+                    "type": "string",
+                    "example": "08:00"
+                },
+                "horario_inicio_semana": {
+                    "type": "string",
+                    "example": "08:00"
+                },
+                "intervalo_consulta": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "limite_agendamentos_dia": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "mensagem_boas_vindas": {
+                    "type": "string",
+                    "example": "Bem-vindo à nossa clínica!"
+                },
+                "permite_agendamento_fds": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "telefone_whatsapp": {
+                    "type": "string",
+                    "example": "11999999999"
+                },
+                "tempo_antecedencia": {
+                    "type": "integer",
+                    "example": 24
+                }
+            }
+        },
+        "controllers.ConfiguracaoResponse": {
+            "type": "object",
+            "properties": {
+                "clinica_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "email_notificacao": {
+                    "type": "string",
+                    "example": "contato@clinica.com"
+                },
+                "funciona_domingo": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "horario_fim_domingo": {
+                    "type": "string",
+                    "example": ""
+                },
+                "horario_fim_sabado": {
+                    "type": "string",
+                    "example": "12:00"
+                },
+                "horario_fim_semana": {
+                    "type": "string",
+                    "example": "18:00"
+                },
+                "horario_inicio_domingo": {
+                    "type": "string",
+                    "example": ""
+                },
+                "horario_inicio_sabado": {
+                    "type": "string",
+                    "example": "08:00"
+                },
+                "horario_inicio_semana": {
+                    "type": "string",
+                    "example": "08:00"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "intervalo_consulta": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "limite_agendamentos_dia": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "mensagem_boas_vindas": {
+                    "type": "string",
+                    "example": "Bem-vindo à nossa clínica!"
+                },
+                "permite_agendamento_fds": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "telefone_whatsapp": {
+                    "type": "string",
+                    "example": "11999999999"
+                },
+                "tempo_antecedencia": {
+                    "type": "integer",
+                    "example": 24
                 }
             }
         },

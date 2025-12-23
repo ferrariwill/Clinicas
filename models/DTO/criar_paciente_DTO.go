@@ -1,4 +1,4 @@
-package dto
+package DTO
 
 type CriarPacienteDTO struct {
 	Nome       string `json:"nome" binding:"required"`

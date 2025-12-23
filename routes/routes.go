@@ -30,6 +30,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	pacienteRepo := repositories.NovoPacienteRepository(db)
 	agendaRepo := repositories.NovaAgendaRepository(db)
 	dashboardRepo := repositories.NovoDashboardRepository(db)
+	configuracaoRepo := repositories.NovaConfiguracaoRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -43,10 +44,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	pacienteService := services.NovoPacienteService(pacienteRepo)
 	agendaService := services.NovaAgendaService(agendaRepo)
 	dashboardService := services.NovoDashboardService(dashboardRepo, pacienteRepo, usurioRepo, procedimentoRepo, agendaRepo)
+	configuracaoService := services.NovaConfiguracaoService(configuracaoRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
-	clinicaController := controllers.NovaClinicaController(clinicaService)
+	clinicaController := controllers.NovaClinicaController(clinicaService, configuracaoService)
 	procedimentoController := controllers.NovoProcedimentoController(procedimentoService)
 	convenioController := controllers.NovoConvenioCoontroller(convenioService)
 	pacienteController := controllers.NovoPacienteController(pacienteService)
@@ -104,6 +106,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		clinicas.PUT("/:id", clinicaController.Atualizar)
 		clinicas.DELETE("/:id", clinicaController.Desativar)
 		clinicas.PUT("/:id/reativar", clinicaController.Reativar)
+
+		//Configurações
+		clinicas.GET("/:id/configuracoes", clinicaController.BuscarConfiguracoes)
+		clinicas.PUT("/:id/configuracoes", clinicaController.AtualizarConfiguracoes)
 
 		//Usuarios
 		clinicas.POST("/usuarios", usuarioController.CriarUsuarioClinica)
