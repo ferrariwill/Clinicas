@@ -287,6 +287,15 @@ definitions:
         example: 5
         type: integer
     type: object
+  controllers.DefinirHorariosRequest:
+    properties:
+      horarios:
+        items:
+          $ref: '#/definitions/controllers.UsuarioHorarioRequest'
+        type: array
+    required:
+    - horarios
+    type: object
   controllers.ErrorResponse:
     properties:
       error:
@@ -476,6 +485,51 @@ definitions:
     required:
     - nova_senha
     - token
+    type: object
+  controllers.UsuarioHorarioRequest:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      dia_semana:
+        example: 1
+        maximum: 6
+        minimum: 0
+        type: integer
+      horario_fim:
+        example: "18:00"
+        type: string
+      horario_inicio:
+        example: "08:00"
+        type: string
+    required:
+    - dia_semana
+    - horario_fim
+    - horario_inicio
+    type: object
+  controllers.UsuarioHorarioResponse:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      dia_semana:
+        example: 1
+        type: integer
+      dia_semana_texto:
+        example: Segunda-feira
+        type: string
+      horario_fim:
+        example: "18:00"
+        type: string
+      horario_inicio:
+        example: "08:00"
+        type: string
+      id:
+        example: 1
+        type: integer
+      usuario_id:
+        example: 1
+        type: integer
     type: object
   controllers.UsuarioInfo:
     properties:
@@ -1222,23 +1276,14 @@ paths:
     get:
       consumes:
       - application/json
-      - application/json
-      description: |-
-        Busca um usuário específico pelo ID
-        Busca um usuário específico pelo ID
+      description: Busca um usuário específico pelo ID
       parameters:
       - description: ID do usuário
         in: path
         name: id
         required: true
         type: integer
-      - description: ID do usuário
-        in: path
-        name: id
-        required: true
-        type: integer
       produces:
-      - application/json
       - application/json
       responses:
         "200":
@@ -1255,10 +1300,8 @@ paths:
             $ref: '#/definitions/controllers.ErrorResponse'
       security:
       - BearerAuth: []
-      - BearerAuth: []
       summary: Buscar usuário por ID
       tags:
-      - Usuários
       - Usuários
     put:
       consumes:
@@ -1294,6 +1337,75 @@ paths:
       security:
       - BearerAuth: []
       summary: Atualizar usuário
+      tags:
+      - Usuários
+  /usuarios/{id}/horarios:
+    get:
+      consumes:
+      - application/json
+      description: Retorna os horários de trabalho do usuário
+      parameters:
+      - description: ID do usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.UsuarioHorarioResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Buscar horários do usuário
+      tags:
+      - Usuários
+    put:
+      consumes:
+      - application/json
+      description: Define os horários de trabalho do usuário
+      parameters:
+      - description: ID do usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Horários do usuário
+        in: body
+        name: horarios
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.DefinirHorariosRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Definir horários do usuário
       tags:
       - Usuários
 securityDefinitions:

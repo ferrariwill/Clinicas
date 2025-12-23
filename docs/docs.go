@@ -1037,33 +1037,20 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAuth": []
-                    },
-                    {
-                        "BearerAuth": []
                     }
                 ],
-                "description": "Busca um usuário específico pelo ID\nBusca um usuário específico pelo ID",
+                "description": "Busca um usuário específico pelo ID",
                 "consumes": [
-                    "application/json",
                     "application/json"
                 ],
                 "produces": [
-                    "application/json",
                     "application/json"
                 ],
                 "tags": [
-                    "Usuários",
                     "Usuários"
                 ],
                 "summary": "Buscar usuário por ID",
                 "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID do usuário",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
                     {
                         "type": "integer",
                         "description": "ID do usuário",
@@ -1173,6 +1160,114 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/usuarios/{id}/horarios": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retorna os horários de trabalho do usuário",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Usuários"
+                ],
+                "summary": "Buscar horários do usuário",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID do usuário",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/controllers.UsuarioHorarioResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Define os horários de trabalho do usuário",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Usuários"
+                ],
+                "summary": "Definir horários do usuário",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID do usuário",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Horários do usuário",
+                        "name": "horarios",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.DefinirHorariosRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -1592,6 +1687,20 @@ const docTemplate = `{
                 }
             }
         },
+        "controllers.DefinirHorariosRequest": {
+            "type": "object",
+            "required": [
+                "horarios"
+            ],
+            "properties": {
+                "horarios": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/controllers.UsuarioHorarioRequest"
+                    }
+                }
+            }
+        },
         "controllers.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -1858,6 +1967,67 @@ const docTemplate = `{
                 "token": {
                     "type": "string",
                     "example": "abc123token"
+                }
+            }
+        },
+        "controllers.UsuarioHorarioRequest": {
+            "type": "object",
+            "required": [
+                "dia_semana",
+                "horario_fim",
+                "horario_inicio"
+            ],
+            "properties": {
+                "ativo": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "dia_semana": {
+                    "type": "integer",
+                    "maximum": 6,
+                    "minimum": 0,
+                    "example": 1
+                },
+                "horario_fim": {
+                    "type": "string",
+                    "example": "18:00"
+                },
+                "horario_inicio": {
+                    "type": "string",
+                    "example": "08:00"
+                }
+            }
+        },
+        "controllers.UsuarioHorarioResponse": {
+            "type": "object",
+            "properties": {
+                "ativo": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "dia_semana": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "dia_semana_texto": {
+                    "type": "string",
+                    "example": "Segunda-feira"
+                },
+                "horario_fim": {
+                    "type": "string",
+                    "example": "18:00"
+                },
+                "horario_inicio": {
+                    "type": "string",
+                    "example": "08:00"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "usuario_id": {
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },

@@ -95,17 +95,6 @@ func (uc *UsuarioController) Listar(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "ID do usuário"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Security BearerAuth
-// @Router /usuarios/{id} [get]
-// @Summary Buscar usuário por ID
-// @Description Busca um usuário específico pelo ID
-// @Tags Usuários
-// @Accept json
-// @Produce json
-// @Param id path int true "ID do usuário"
 // @Success 200 {object} UsuarioResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
