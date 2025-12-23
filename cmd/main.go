@@ -30,6 +30,14 @@ func main() {
 
 	db := database.ConnectDB()
 
+	// Verificar se é para executar migrations
+	if len(os.Args) > 1 && os.Args[1] == "--migrate" {
+		log.Println("Executando migrations...")
+		database.RunMigrations(db)
+		log.Println("Migrations executadas com sucesso!")
+		return
+	}
+
 	r := gin.Default()
 
 	// Swagger endpoint
