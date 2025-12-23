@@ -18,6 +18,17 @@ func NovaClinicaController(s services.ClinicaService) *ClinicaController {
 	return &ClinicaController{service: s}
 }
 
+// @Summary Criar clínica
+// @Description Cria uma nova clínica
+// @Tags Clínicas
+// @Accept json
+// @Produce json
+// @Param clinica body ClinicaRequest true "Dados da clínica"
+// @Success 201 {object} ClinicaResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /clinicas [post]
 func (cc *ClinicaController) Criar(c *gin.Context) {
 	var clinica models.Clinica
 	if err := c.ShouldBindJSON(&clinica); err != nil {
@@ -33,6 +44,16 @@ func (cc *ClinicaController) Criar(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"clinica": clinica})
 }
 
+// @Summary Listar clínicas
+// @Description Lista todas as clínicas
+// @Tags Clínicas
+// @Accept json
+// @Produce json
+// @Param ativas query boolean false "Filtrar apenas clínicas ativas"
+// @Success 200 {array} ClinicaResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /clinicas [get]
 func (cc *ClinicaController) Listar(c *gin.Context) {
 	var filtro *bool
 	if param := c.Query("ativas"); param != "" {

@@ -20,6 +20,18 @@ func NovaAgendaController(service services.AgendaService) *AgendaController {
 	return &AgendaController{service: service}
 }
 
+// @Summary Criar agendamento
+// @Description Cria um novo agendamento na clínica
+// @Tags Agenda
+// @Accept json
+// @Produce json
+// @Param agendamento body AgendaRequest true "Dados do agendamento"
+// @Success 201 {object} AgendaResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /clinicas/agenda [post]
 func (ac AgendaController) Criar(c *gin.Context) {
 	var dto dto.CriarAgendaDTO
 	if err := c.ShouldBindJSON(&dto); err != nil {
@@ -42,6 +54,16 @@ func (ac AgendaController) Criar(c *gin.Context) {
 	c.JSON(http.StatusCreated, agenda)
 }
 
+// @Summary Listar agendamentos
+// @Description Lista todos os agendamentos da clínica
+// @Tags Agenda
+// @Accept json
+// @Produce json
+// @Success 200 {array} AgendaResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /clinicas/agenda [get]
 func (ac AgendaController) Listar(c *gin.Context) {
 	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
@@ -57,6 +79,18 @@ func (ac AgendaController) Listar(c *gin.Context) {
 	c.JSON(http.StatusOK, agendas)
 }
 
+// @Summary Atualizar status do agendamento
+// @Description Atualiza o status de um agendamento
+// @Tags Agenda
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do agendamento"
+// @Param status body AtualizarStatusRequest true "Novo status"
+// @Success 200 {object} MessageResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /clinicas/agenda/{id}/status [put]
 func (ac AgendaController) AtualizarStatus(c *gin.Context) {
 	id, err := utils.StringParaUint(c.Param("id"))
 	if err != nil {

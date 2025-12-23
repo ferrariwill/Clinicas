@@ -21,6 +21,17 @@ func NovoPacienteController(service services.PacienteService) *PacienteControlle
 	}
 }
 
+// @Summary Criar paciente
+// @Description Cria um novo paciente na clínica
+// @Tags Pacientes
+// @Accept json
+// @Produce json
+// @Param paciente body PacienteRequest true "Dados do paciente"
+// @Success 201 {object} MessageResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /pacientes [post]
 func (cc *PacienteController) Criar(c *gin.Context) {
 	var dto dto.CriarPacienteDTO
 	if err := c.ShouldBindJSON(&dto); err != nil {
@@ -43,6 +54,17 @@ func (cc *PacienteController) Criar(c *gin.Context) {
 
 }
 
+// @Summary Buscar paciente por CPF
+// @Description Busca um paciente específico pelo CPF
+// @Tags Pacientes
+// @Accept json
+// @Produce json
+// @Param cpf path string true "CPF do paciente"
+// @Success 200 {object} PacienteResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /pacientes/{cpf} [get]
 func (cc *PacienteController) Buscar(c *gin.Context) {
 	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
@@ -61,6 +83,16 @@ func (cc *PacienteController) Buscar(c *gin.Context) {
 	c.JSON(http.StatusOK, paciente)
 }
 
+// @Summary Listar pacientes
+// @Description Lista todos os pacientes da clínica
+// @Tags Pacientes
+// @Accept json
+// @Produce json
+// @Success 200 {array} PacienteResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /pacientes [get]
 func (cc *PacienteController) Listar(c *gin.Context) {
 	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {

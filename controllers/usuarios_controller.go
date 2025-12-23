@@ -19,6 +19,17 @@ func NovoUsuarioController(usuarioService services.UsuarioService) *UsuarioContr
 	return &UsuarioController{usuarioService: usuarioService}
 }
 
+// @Summary Criar usuário
+// @Description Cria um novo usuário na clínica
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param usuario body UsuarioRequest true "Dados do usuário"
+// @Success 201 {object} UsuarioResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /usuarios [post]
 func (uc *UsuarioController) Criar(c *gin.Context) {
 	var u models.Usuario
 
@@ -41,6 +52,17 @@ func (uc *UsuarioController) Criar(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"usuario": u})
 }
 
+// @Summary Listar usuários
+// @Description Lista todos os usuários da clínica
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param ativos query boolean false "Filtrar apenas usuários ativos"
+// @Success 200 {array} UsuarioResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /usuarios [get]
 func (uc *UsuarioController) Listar(c *gin.Context) {
 	clinicaId, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
@@ -63,6 +85,28 @@ func (uc *UsuarioController) Listar(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"usuarios": usuarios})
 }
 
+// @Summary Buscar usuário por ID
+// @Description Busca um usuário específico pelo ID
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do usuário"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /usuarios/{id} [get]
+// @Summary Buscar usuário por ID
+// @Description Busca um usuário específico pelo ID
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do usuário"
+// @Success 200 {object} UsuarioResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /usuarios/{id} [get]
 func (uc *UsuarioController) Buscar(c *gin.Context) {
 	id := c.Param("id")
 	usuarioId, err := strconv.ParseUint(id, 10, 32)
@@ -80,6 +124,18 @@ func (uc *UsuarioController) Buscar(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"usuario": usuario})
 }
 
+// @Summary Atualizar usuário
+// @Description Atualiza os dados de um usuário
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do usuário"
+// @Param usuario body UsuarioRequest true "Dados do usuário"
+// @Success 200 {object} UsuarioResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /usuarios/{id} [put]
 func (uc *UsuarioController) Atualizar(c *gin.Context) {
 	id := c.Param("id")
 	usuarioId, err := strconv.ParseUint(id, 10, 32)
@@ -103,6 +159,17 @@ func (uc *UsuarioController) Atualizar(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"usuario": u})
 }
 
+// @Summary Desativar usuário
+// @Description Desativa um usuário
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do usuário"
+// @Success 200 {object} MessageResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /usuarios/{id} [delete]
 func (uc *UsuarioController) Deletar(c *gin.Context) {
 	id := c.Param("id")
 	usuarioId, err := strconv.ParseUint(id, 10, 32)

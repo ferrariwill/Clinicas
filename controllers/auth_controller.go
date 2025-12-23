@@ -75,15 +75,32 @@ func LoginHandler(authService services.AuthService) gin.HandlerFunc {
 	}
 }
 
+// AlterarSenhaRequest representa os dados para alterar senha
+type AlterarSenhaRequest struct {
+	Senha     string `json:"senha" binding:"required" example:"senhaAtual123"`
+	NovaSenha string `json:"nova_senha" binding:"required" example:"novaSenha456"`
+}
+
+// @Summary Alterar senha
+// @Description Altera a senha do usuário autenticado
+// @Tags Autenticação
+// @Accept json
+// @Produce json
+// @Param dados body AlterarSenhaRequest true "Dados para alterar senha"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Security BearerAuth
+// @Router /auth/alterar-senha [put]
 func AlterarSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		var req struct {
-			Senha     string `json:"senha"`
-			NovaSenha string `json:"nova_senha"`
-		}
+		var req AlterarSenhaRequest
 
-		c.BindJSON(&req)
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		usuarioId, _ := middleware.ExtrairDoToken[uint](c, "usuario_id")
 		err := authService.AlterarSenha(usuarioId, req.Senha, req.NovaSenha)
 		if err != nil {
@@ -96,14 +113,36 @@ func AlterarSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 	}
 }
 
+// EsqueciSenhaRequest representa os dados para esqueci senha
+type EsqueciSenhaRequest struct {
+	Email string `json:"email" binding:"required,email" example:"usuario@exemplo.com"`
+}
+
+// RedefinirSenhaRequest representa os dados para redefinir senha
+type RedefinirSenhaRequest struct {
+	Token     string `json:"token" binding:"required" example:"abc123token"`
+	NovaSenha string `json:"nova_senha" binding:"required" example:"novaSenha123"`
+}
+
+// @Summary Esqueci minha senha
+// @Description Envia email para redefinição de senha
+// @Tags Autenticação
+// @Accept json
+// @Produce json
+// @Param dados body EsqueciSenhaRequest true "Email para redefinição"
+// @Success 200 {object} MessageResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /auth/esqueci-senha [post]
 func EsqueciSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		var req struct {
-			Email string `json:"email"`
-		}
+		var req EsqueciSenhaRequest
 
-		c.BindJSON(&req)
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		err := authService.GerarTokenRedifinicao(req.Email)
 		if err != nil {
@@ -116,15 +155,25 @@ func EsqueciSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 	}
 }
 
+// @Summary Redefinir senha
+// @Description Redefine a senha usando token recebido por email
+// @Tags Autenticação
+// @Accept json
+// @Produce json
+// @Param dados body RedefinirSenhaRequest true "Token e nova senha"
+// @Success 200 {object} MessageResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /auth/redefinir-senha [post]
 func RedefinirSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		var req struct {
-			Token     string `json:"token"`
-			NovaSenha string `json:"nova_senha"`
-		}
+		var req RedefinirSenhaRequest
 
-		c.BindJSON(&req)
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		err := authService.RedefinirSenha(req.Token, req.NovaSenha)
 		if err != nil {
