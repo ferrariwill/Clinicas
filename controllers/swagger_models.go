@@ -117,3 +117,55 @@ type AgendaResponse struct {
 type AtualizarStatusRequest struct {
 	StatusID uint `json:"status_id" binding:"required" example:"2"`
 }
+
+// DashboardResponse representa o dashboard principal
+type DashboardResponse struct {
+	TotalPacientes      int     `json:"total_pacientes" example:"150"`
+	TotalUsuarios       int     `json:"total_usuarios" example:"5"`
+	TotalProcedimentos  int     `json:"total_procedimentos" example:"25"`
+	AgendamentosHoje    int     `json:"agendamentos_hoje" example:"12"`
+	AgendamentosSemana  int     `json:"agendamentos_semana" example:"45"`
+	ReceitaMes          float64 `json:"receita_mes" example:"15000.50"`
+	PacientesAtivos     int     `json:"pacientes_ativos" example:"140"`
+	ProximosAgendamentos []AgendamentoResumo `json:"proximos_agendamentos"`
+}
+
+// AgendamentoHojeResponse representa agendamentos do dia
+type AgendamentoHojeResponse struct {
+	ID              uint   `json:"id" example:"1"`
+	Horario         string `json:"horario" example:"10:00"`
+	PacienteNome    string `json:"paciente_nome" example:"Maria Silva"`
+	ProcedimentoNome string `json:"procedimento_nome" example:"Consulta Médica"`
+	UsuarioNome     string `json:"usuario_nome" example:"Dr. João"`
+	Status          string `json:"status" example:"Agendado"`
+	Observacoes     string `json:"observacoes" example:"Paciente com alergia"`
+}
+
+// EstatisticasResponse representa estatísticas da clínica
+type EstatisticasResponse struct {
+	PacientesPorMes     []EstatisticaMensal `json:"pacientes_por_mes"`
+	AgendamentosPorMes  []EstatisticaMensal `json:"agendamentos_por_mes"`
+	ReceitaPorMes       []EstatisticaMensal `json:"receita_por_mes"`
+	ProcedimentosPopulares []ProcedimentoPopular `json:"procedimentos_populares"`
+}
+
+// EstatisticaMensal representa dados mensais
+type EstatisticaMensal struct {
+	Mes   string  `json:"mes" example:"2024-01"`
+	Total int     `json:"total" example:"25"`
+	Valor float64 `json:"valor,omitempty" example:"5000.00"`
+}
+
+// ProcedimentoPopular representa procedimentos mais realizados
+type ProcedimentoPopular struct {
+	Nome  string `json:"nome" example:"Consulta Médica"`
+	Total int    `json:"total" example:"45"`
+}
+
+// AgendamentoResumo representa resumo de agendamento
+type AgendamentoResumo struct {
+	ID           uint   `json:"id" example:"1"`
+	DataHora     string `json:"data_hora" example:"2024-01-15 10:00"`
+	Paciente     string `json:"paciente" example:"Maria Silva"`
+	Procedimento string `json:"procedimento" example:"Consulta"`
+}

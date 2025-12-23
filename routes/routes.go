@@ -29,6 +29,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	convenioRepo := repositories.NovoConvenioRepository(db)
 	pacienteRepo := repositories.NovoPacienteRepository(db)
 	agendaRepo := repositories.NovaAgendaRepository(db)
+	dashboardRepo := repositories.NovoDashboardRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -41,6 +42,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	convenioService := services.NovoConvenioService(convenioRepo, procedimentoRepo)
 	pacienteService := services.NovoPacienteService(pacienteRepo)
 	agendaService := services.NovaAgendaService(agendaRepo)
+	dashboardService := services.NovoDashboardService(dashboardRepo, pacienteRepo, usurioRepo, procedimentoRepo, agendaRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
@@ -49,6 +51,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	convenioController := controllers.NovoConvenioCoontroller(convenioService)
 	pacienteController := controllers.NovoPacienteController(pacienteService)
 	agendaController := controllers.NovaAgendaController(agendaService)
+	dashboardController := controllers.NovoDashboardController(dashboardService)
 	financeiroController := controllers.NovoFinanceiroController()
 	adminController := controllers.NovoAdminController(planoService,
 		telaService,
@@ -61,6 +64,14 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	r.PUT("/auth/alterar-senha", middleware.Autenticado(), controllers.AlterarSenhaHandler(authService))
 	r.POST("/auth/esqueci-senha", controllers.EsqueciSenhaHandler(authService))
 	r.POST("/auth/redefinir-senha", controllers.RedefinirSenhaHandler(authService))
+
+	//Endpoints do Dashboard
+	dash := r.Group("/dashboard", middleware.Autenticado())
+	{
+		dash.GET("", dashboardController.Dashboard)
+		dash.GET("/agendamentos-hoje", dashboardController.AgendamentosHoje)
+		dash.GET("/estatisticas", dashboardController.Estatisticas)
+	}
 
 	//Endpoints referente a parte de usuário
 	usuarios := r.Group("/usuarios", middleware.Autenticado())

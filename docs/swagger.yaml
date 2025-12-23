@@ -56,6 +56,45 @@ definitions:
         example: 1
         type: integer
     type: object
+  controllers.AgendamentoHojeResponse:
+    properties:
+      horario:
+        example: "10:00"
+        type: string
+      id:
+        example: 1
+        type: integer
+      observacoes:
+        example: Paciente com alergia
+        type: string
+      paciente_nome:
+        example: Maria Silva
+        type: string
+      procedimento_nome:
+        example: Consulta Médica
+        type: string
+      status:
+        example: Agendado
+        type: string
+      usuario_nome:
+        example: Dr. João
+        type: string
+    type: object
+  controllers.AgendamentoResumo:
+    properties:
+      data_hora:
+        example: 2024-01-15 10:00
+        type: string
+      id:
+        example: 1
+        type: integer
+      paciente:
+        example: Maria Silva
+        type: string
+      procedimento:
+        example: Consulta
+        type: string
+    type: object
   controllers.AlterarSenhaRequest:
     properties:
       nova_senha:
@@ -124,6 +163,34 @@ definitions:
         example: (11) 99999-9999
         type: string
     type: object
+  controllers.DashboardResponse:
+    properties:
+      agendamentos_hoje:
+        example: 12
+        type: integer
+      agendamentos_semana:
+        example: 45
+        type: integer
+      pacientes_ativos:
+        example: 140
+        type: integer
+      proximos_agendamentos:
+        items:
+          $ref: '#/definitions/controllers.AgendamentoResumo'
+        type: array
+      receita_mes:
+        example: 15000.5
+        type: number
+      total_pacientes:
+        example: 150
+        type: integer
+      total_procedimentos:
+        example: 25
+        type: integer
+      total_usuarios:
+        example: 5
+        type: integer
+    type: object
   controllers.ErrorResponse:
     properties:
       error:
@@ -137,6 +204,37 @@ definitions:
         type: string
     required:
     - email
+    type: object
+  controllers.EstatisticaMensal:
+    properties:
+      mes:
+        example: 2024-01
+        type: string
+      total:
+        example: 25
+        type: integer
+      valor:
+        example: 5000
+        type: number
+    type: object
+  controllers.EstatisticasResponse:
+    properties:
+      agendamentos_por_mes:
+        items:
+          $ref: '#/definitions/controllers.EstatisticaMensal'
+        type: array
+      pacientes_por_mes:
+        items:
+          $ref: '#/definitions/controllers.EstatisticaMensal'
+        type: array
+      procedimentos_populares:
+        items:
+          $ref: '#/definitions/controllers.ProcedimentoPopular'
+        type: array
+      receita_por_mes:
+        items:
+          $ref: '#/definitions/controllers.EstatisticaMensal'
+        type: array
     type: object
   controllers.LoginRequest:
     properties:
@@ -219,6 +317,15 @@ definitions:
       telefone:
         example: (11) 99999-9999
         type: string
+    type: object
+  controllers.ProcedimentoPopular:
+    properties:
+      nome:
+        example: Consulta Médica
+        type: string
+      total:
+        example: 45
+        type: integer
     type: object
   controllers.ProcedimentoRequest:
     properties:
@@ -596,6 +703,83 @@ paths:
       summary: Atualizar status do agendamento
       tags:
       - Agenda
+  /dashboard:
+    get:
+      consumes:
+      - application/json
+      description: Retorna métricas gerais da clínica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.DashboardResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Dashboard principal
+      tags:
+      - Dashboard
+  /dashboard/agendamentos-hoje:
+    get:
+      consumes:
+      - application/json
+      description: Retorna os agendamentos do dia atual
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.AgendamentoHojeResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Agendamentos de hoje
+      tags:
+      - Dashboard
+  /dashboard/estatisticas:
+    get:
+      consumes:
+      - application/json
+      description: Retorna estatísticas básicas da clínica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.EstatisticasResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Estatísticas da clínica
+      tags:
+      - Dashboard
   /login:
     post:
       consumes:

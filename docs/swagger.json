@@ -411,6 +411,129 @@
                 }
             }
         },
+        "/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retorna métricas gerais da clínica",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Dashboard principal",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.DashboardResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/agendamentos-hoje": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retorna os agendamentos do dia atual",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Agendamentos de hoje",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/controllers.AgendamentoHojeResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/estatisticas": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retorna estatísticas básicas da clínica",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Estatísticas da clínica",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.EstatisticasResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/login": {
             "post": {
                 "description": "Autentica um usuário e retorna um token JWT",
@@ -1041,6 +1164,60 @@
                 }
             }
         },
+        "controllers.AgendamentoHojeResponse": {
+            "type": "object",
+            "properties": {
+                "horario": {
+                    "type": "string",
+                    "example": "10:00"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "observacoes": {
+                    "type": "string",
+                    "example": "Paciente com alergia"
+                },
+                "paciente_nome": {
+                    "type": "string",
+                    "example": "Maria Silva"
+                },
+                "procedimento_nome": {
+                    "type": "string",
+                    "example": "Consulta Médica"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Agendado"
+                },
+                "usuario_nome": {
+                    "type": "string",
+                    "example": "Dr. João"
+                }
+            }
+        },
+        "controllers.AgendamentoResumo": {
+            "type": "object",
+            "properties": {
+                "data_hora": {
+                    "type": "string",
+                    "example": "2024-01-15 10:00"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "paciente": {
+                    "type": "string",
+                    "example": "Maria Silva"
+                },
+                "procedimento": {
+                    "type": "string",
+                    "example": "Consulta"
+                }
+            }
+        },
         "controllers.AlterarSenhaRequest": {
             "type": "object",
             "required": [
@@ -1135,6 +1312,45 @@
                 }
             }
         },
+        "controllers.DashboardResponse": {
+            "type": "object",
+            "properties": {
+                "agendamentos_hoje": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "agendamentos_semana": {
+                    "type": "integer",
+                    "example": 45
+                },
+                "pacientes_ativos": {
+                    "type": "integer",
+                    "example": 140
+                },
+                "proximos_agendamentos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/controllers.AgendamentoResumo"
+                    }
+                },
+                "receita_mes": {
+                    "type": "number",
+                    "example": 15000.5
+                },
+                "total_pacientes": {
+                    "type": "integer",
+                    "example": 150
+                },
+                "total_procedimentos": {
+                    "type": "integer",
+                    "example": 25
+                },
+                "total_usuarios": {
+                    "type": "integer",
+                    "example": 5
+                }
+            }
+        },
         "controllers.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -1153,6 +1369,52 @@
                 "email": {
                     "type": "string",
                     "example": "usuario@exemplo.com"
+                }
+            }
+        },
+        "controllers.EstatisticaMensal": {
+            "type": "object",
+            "properties": {
+                "mes": {
+                    "type": "string",
+                    "example": "2024-01"
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 25
+                },
+                "valor": {
+                    "type": "number",
+                    "example": 5000
+                }
+            }
+        },
+        "controllers.EstatisticasResponse": {
+            "type": "object",
+            "properties": {
+                "agendamentos_por_mes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/controllers.EstatisticaMensal"
+                    }
+                },
+                "pacientes_por_mes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/controllers.EstatisticaMensal"
+                    }
+                },
+                "procedimentos_populares": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/controllers.ProcedimentoPopular"
+                    }
+                },
+                "receita_por_mes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/controllers.EstatisticaMensal"
+                    }
                 }
             }
         },
@@ -1267,6 +1529,19 @@
                 "telefone": {
                     "type": "string",
                     "example": "(11) 99999-9999"
+                }
+            }
+        },
+        "controllers.ProcedimentoPopular": {
+            "type": "object",
+            "properties": {
+                "nome": {
+                    "type": "string",
+                    "example": "Consulta Médica"
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 45
                 }
             }
         },
