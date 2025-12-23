@@ -1,118 +1,87 @@
-openapi: 3.0.0
+basePath: /
+definitions:
+  controllers.LoginRequest:
+    properties:
+      email:
+        example: usuario@exemplo.com
+        type: string
+      senha:
+        example: "123456"
+        type: string
+    required:
+    - email
+    - senha
+    type: object
+  controllers.LoginResponse:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      usuario:
+        $ref: '#/definitions/controllers.UsuarioInfo'
+    type: object
+  controllers.UsuarioInfo:
+    properties:
+      clinica_id:
+        example: 1
+        type: integer
+      email:
+        example: joao@exemplo.com
+        type: string
+      id:
+        example: 1
+        type: integer
+      nome:
+        example: João Silva
+        type: string
+      tipo_usuario_id:
+        example: 1
+        type: integer
+    type: object
+host: localhost:8080
 info:
-  title: API Clínicas
+  contact: {}
   description: API para gestão de clínicas, procedimentos e agendamentos
-  version: 1.0.0
-servers:
-  - url: http://localhost:8080
-    description: Servidor local de desenvolvimento
-
+  title: API Clínicas
+  version: "1.0"
 paths:
   /login:
     post:
+      consumes:
+      - application/json
+      description: Autentica um usuário e retorna um token JWT
+      parameters:
+      - description: Dados de login
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Login de usuário
-      description: Retorna um token JWT para autenticação
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                senha:
-                  type: string
-      responses:
-        '200':
-          description: Token JWT gerado
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  token:
-                    type: string
-
-  /clinicas:
-    get:
-      summary: Listar clínicas
-      responses:
-        '200':
-          description: Lista de clínicas
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Clinica'
-    post:
-      summary: Criar clínica
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Clinica'
-      responses:
-        '201':
-          description: Clínica criada
-
-  /clinicas/{id}:
-    get:
-      summary: Buscar clínica por ID
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Clínica encontrada
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Clinica'
-    put:
-      summary: Atualizar clínica
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Clinica'
-      responses:
-        '200':
-          description: Clínica atualizada
-    delete:
-      summary: Deletar clínica
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '204':
-          description: Clínica removida
-
-components:
-  schemas:
-    Clinica:
-      type: object
-      properties:
-        id:
-          type: integer
-        nome:
-          type: string
-        endereco:
-          type: string
-        telefone:
-          type: string
+      tags:
+      - Autenticação
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

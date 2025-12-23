@@ -8,15 +8,46 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// LoginRequest representa os dados de login
+type LoginRequest struct {
+	Email string `json:"email" binding:"required,email" example:"usuario@exemplo.com"`
+	Senha string `json:"senha" binding:"required" example:"123456"`
+}
+
+// LoginResponse representa a resposta do login
+type LoginResponse struct {
+	Token   string      `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	Usuario UsuarioInfo `json:"usuario"`
+}
+
+// UsuarioInfo representa as informações do usuário
+type UsuarioInfo struct {
+	ID            uint   `json:"id" example:"1"`
+	Nome          string `json:"nome" example:"João Silva"`
+	Email         string `json:"email" example:"joao@exemplo.com"`
+	TipoUsuarioID uint   `json:"tipo_usuario_id" example:"1"`
+	ClinicaID     *uint  `json:"clinica_id" example:"1"`
+}
+
+// @Summary Login de usuário
+// @Description Autentica um usuário e retorna um token JWT
+// @Tags Autenticação
+// @Accept json
+// @Produce json
+// @Param login body LoginRequest true "Dados de login"
+// @Success 200 {object} LoginResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Router /login [post]
 func LoginHandler(authService services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		var req struct {
-			Email string `json:"email"`
-			Senha string `json:"senha"`
-		}
+		var req LoginRequest
 
-		c.BindJSON(&req)
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		usuario, err := authService.Login(req.Email, req.Senha)
 		if err != nil {
@@ -30,14 +61,14 @@ func LoginHandler(authService services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"token": token,
-			"usuario": gin.H{
-				"id":              usuario.ID,
-				"nome":            usuario.Nome,
-				"email":           usuario.Email,
-				"tipo_usuario_id": usuario.TipoUsuarioID,
-				"clinica_id":      usuario.ClinicaID,
+		c.JSON(http.StatusOK, LoginResponse{
+			Token: token,
+			Usuario: UsuarioInfo{
+				ID:            usuario.ID,
+				Nome:          usuario.Nome,
+				Email:         usuario.Email,
+				TipoUsuarioID: usuario.TipoUsuarioID,
+				ClinicaID:     &usuario.ClinicaID,
 			},
 		})
 
