@@ -31,6 +31,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	agendaRepo := repositories.NovaAgendaRepository(db)
 	dashboardRepo := repositories.NovoDashboardRepository(db)
 	configuracaoRepo := repositories.NovaConfiguracaoRepository(db)
+	usuarioHorarioRepo := repositories.NovoUsuarioHorarioRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -45,9 +46,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	agendaService := services.NovaAgendaService(agendaRepo)
 	dashboardService := services.NovoDashboardService(dashboardRepo, pacienteRepo, usurioRepo, procedimentoRepo, agendaRepo)
 	configuracaoService := services.NovaConfiguracaoService(configuracaoRepo)
+	usuarioHorarioService := services.NovoUsuarioHorarioService(usuarioHorarioRepo)
 
 	//Inicializacao de controllers
-	usuarioController := controllers.NovoUsuarioController(usuarioService)
+	usuarioController := controllers.NovoUsuarioController(usuarioService, usuarioHorarioService)
 	clinicaController := controllers.NovaClinicaController(clinicaService, configuracaoService)
 	procedimentoController := controllers.NovoProcedimentoController(procedimentoService)
 	convenioController := controllers.NovoConvenioCoontroller(convenioService)
@@ -84,6 +86,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		usuarios.PUT("/:id", usuarioController.Atualizar)
 		usuarios.DELETE("/:id", usuarioController.Deletar)
 		usuarios.PUT("/:id/reativar", usuarioController.Ativar)
+
+		//Horários
+		usuarios.GET("/:id/horarios", usuarioController.BuscarHorarios)
+		usuarios.PUT("/:id/horarios", usuarioController.DefinirHorarios)
 	}
 
 	//Enspoints referente a parte de paciente

@@ -13,10 +13,14 @@ import (
 
 type UsuarioController struct {
 	usuarioService services.UsuarioService
+	horarioService services.UsuarioHorarioService
 }
 
-func NovoUsuarioController(usuarioService services.UsuarioService) *UsuarioController {
-	return &UsuarioController{usuarioService: usuarioService}
+func NovoUsuarioController(usuarioService services.UsuarioService, horarioService services.UsuarioHorarioService) *UsuarioController {
+	return &UsuarioController{
+		usuarioService: usuarioService,
+		horarioService: horarioService,
+	}
 }
 
 // @Summary Criar usuário
@@ -237,4 +241,66 @@ func (uc *UsuarioController) CriarUsuarioClinica(c *gin.Context) {
 	}
 	usuario.Senha = ""
 	c.JSON(http.StatusCreated, usuario)
+}
+
+// @Summary Buscar horários do usuário
+// @Description Retorna os horários de trabalho do usuário
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do usuário"
+// @Success 200 {array} UsuarioHorarioResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /usuarios/{id}/horarios [get]
+func (uc *UsuarioController) BuscarHorarios(c *gin.Context) {
+	id := c.Param("id")
+	usuarioId, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	horarios, err := uc.horarioService.BuscarHorarios(uint(usuarioId))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, horarios)
+}
+
+// @Summary Definir horários do usuário
+// @Description Define os horários de trabalho do usuário
+// @Tags Usuários
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do usuário"
+// @Param horarios body DefinirHorariosRequest true "Horários do usuário"
+// @Success 200 {object} MessageResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /usuarios/{id}/horarios [put]
+func (uc *UsuarioController) DefinirHorarios(c *gin.Context) {
+	id := c.Param("id")
+	usuarioId, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	var req dto.DefinirHorariosRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+
+	if err := uc.horarioService.DefinirHorarios(uint(usuarioId), &req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Horários definidos com sucesso"})
 }
