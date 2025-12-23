@@ -27,6 +27,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	assinaturaRepo := repositories.NovaAssinaturaRepository(db)
 	procedimentoRepo := repositories.NovoProcedimentoRepository(db)
 	convenioRepo := repositories.NovoConvenioRepository(db)
+	pacienteRepo := repositories.NovoPacienteRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -37,12 +38,14 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	assinaturaService := services.NovaAssinaturaService(assinaturaRepo)
 	procedimentoService := services.NovoProcedimentoService(procedimentoRepo, convenioRepo)
 	convenioService := services.NovoConvenioService(convenioRepo, procedimentoRepo)
+	pacienteService := services.NovoPacienteService(pacienteRepo)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService)
 	clinicaController := controllers.NovaClinicaController(clinicaService)
 	procedimentoController := controllers.NovoProcedimentoController(procedimentoService)
 	convenioController := controllers.NovoConvenioCoontroller(convenioService)
+	pacienteController := controllers.NovoPacienteController(pacienteService)
 	financeiroController := controllers.NovoFinanceiroController()
 	adminController := controllers.NovoAdminController(planoService,
 		telaService,
@@ -65,6 +68,17 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		usuarios.PUT("/:id", usuarioController.Atualizar)
 		usuarios.DELETE("/:id", usuarioController.Deletar)
 		usuarios.PUT("/:id/reativar", usuarioController.Ativar)
+	}
+
+	//Enspoints referente a parte de paciente
+	pacientes := r.Group("/pacientes", middleware.Autenticado())
+	{
+		pacientes.POST("", pacienteController.Criar)
+		pacientes.GET("", pacienteController.Listar)
+		pacientes.GET("/:cpf", pacienteController.Buscar)
+		pacientes.PUT("/:id", pacienteController.Atualizar)
+		pacientes.DELETE("/:id", pacienteController.Desativar)
+		pacientes.PUT("/:id/reativar", pacienteController.Reativar)
 	}
 
 	//endpoints referente a parte de clinica

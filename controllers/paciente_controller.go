@@ -92,7 +92,7 @@ func (cc *PacienteController) Atualizar(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Paciente atualizado com sucesso"})
 }
 
-func (cc *PacienteController) Deletar(c *gin.Context) {
+func (cc *PacienteController) Desativar(c *gin.Context) {
 	id, err := utils.StringParaUint(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
