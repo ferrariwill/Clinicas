@@ -20,6 +20,6 @@ type Agenda struct {
 	Convenio            *Convenio         `gorm:"foreignKey:ConvenioID"`
 	DataHora            time.Time         `json:"data_hora"`
 	StatusAgendamentoID uint              `json:"status_id"`
-	StatusAgendamento   StatusAgendamento `gorm:"foreignKey:StatusID"`
+	StatusAgendamento   StatusAgendamento `gorm:"foreignKey:StatusAgendamentoID"`
 	Observacoes         string            `json:"observacoes"`
 }

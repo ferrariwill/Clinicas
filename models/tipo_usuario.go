@@ -1,7 +1,9 @@
 package models
 
+import "gorm.io/gorm"
+
 type TipoUsuario struct {
-	ID        uint `gorm:"primaryKey"`
+	gorm.Model
 	Nome      string
 	Descricao string
 	ClinicaID uint

@@ -56,6 +56,7 @@ func createInitialData(db *gorm.DB) {
 		tipoAdmin = models.TipoUsuario{
 			Nome:      "Administrador",
 			Descricao: "Administrador do sistema",
+			ClinicaID: clinica.ID,
 		}
 		db.Create(&tipoAdmin)
 		log.Println("Tipo usuário admin criado")
@@ -64,7 +65,7 @@ func createInitialData(db *gorm.DB) {
 	// Criar usuário admin
 	adminEmail := os.Getenv("ADMIN_EMAIL")
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
-	
+
 	if adminEmail == "" {
 		adminEmail = "admin@admin.com"
 	}
