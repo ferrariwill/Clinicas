@@ -121,6 +121,17 @@ func (ac AgendaController) AtualizarStatus(c *gin.Context) {
 
 }
 
+// @Summary Horários Disponíveis
+// @Description Buscar horários disponíveis para agendamento
+// @Tags Agenda
+// @Accept json
+// @Produce json
+// @Param usuario_id query int true "ID do usuário"
+// @Param procedimento_id query int true "ID do procedimento"
+// @Param data query string true "Data no formato YYYY-MM-DD"
+// @Success 200 {object} map[string]interface{}
+// @Router /clinicas/agenda/horarios-disponiveis [get]
+// @Security BearerAuth
 func (ac AgendaController) HorariosDisponiveis(c *gin.Context) {
 	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {

@@ -33,6 +33,17 @@ func NovoAdminController(planoService services.PlanoService,
 
 /*Assinaturas*/
 
+// @Summary Criar assinatura
+// @Description Cria uma nova assinatura
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param assinatura body dto.CriarAssinaturaDTO true "Dados da assinatura"
+// @Success 201 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/assinaturas [post]
 func (ac AdminController) CriarAssinatura(c *gin.Context) {
 	var assinaturaDto dto.CriarAssinaturaDTO
 	if err := c.ShouldBindJSON(&assinaturaDto); err != nil {
@@ -55,6 +66,15 @@ func (ac AdminController) CriarAssinatura(c *gin.Context) {
 	c.JSON(http.StatusCreated, assinatura)
 }
 
+// @Summary Listar assinaturas
+// @Description Lista todas as assinaturas
+// @Tags Admin
+// @Produce json
+// @Param ativo query bool false "Filtrar por ativo"
+// @Success 200 {array} models.Assinatura
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/assinaturas [get]
 func (ac AdminController) ListarAssinaturas(c *gin.Context) {
 	ativoStr := c.Query("ativo")
 	var ativo *bool

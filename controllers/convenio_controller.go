@@ -22,6 +22,14 @@ func NovoConvenioCoontroller(service services.ConvenioServices) *ConvenioControl
 	}
 }
 
+// @Summary Cadastrar Convênio
+// @Description Cadastrar um novo convênio
+// @Tags Convênios
+// @Accept json
+// @Produce json
+// @Success 201 {object} map[string]interface{}
+// @Router /convenios [post]
+// @Security BearerAuth
 func (c ConvenioController) Cadastrar(ctx *gin.Context) {
 	clinicaID, err := middleware.ExtrairDoToken[uint](ctx, "clinica_id")
 	if err != nil {
@@ -48,6 +56,15 @@ func (c ConvenioController) Cadastrar(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, gin.H{"mensagem": "Convenio criado com sucesso!"})
 }
 
+// @Summary Atualizar Convênio
+// @Description Atualizar um convênio existente
+// @Tags Convênios
+// @Accept json
+// @Produce json
+// @Param id path int true "ID do convênio"
+// @Success 200 {object} map[string]interface{}
+// @Router /convenios/{id} [put]
+// @Security BearerAuth
 func (c ConvenioController) Atualizar(ctx *gin.Context) {
 	clinicaID, err := middleware.ExtrairDoToken[uint](ctx, "clinica_id")
 	if err != nil {
