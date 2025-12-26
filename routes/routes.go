@@ -32,6 +32,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	dashboardRepo := repositories.NovoDashboardRepository(db)
 	configuracaoRepo := repositories.NovaConfiguracaoRepository(db)
 	usuarioHorarioRepo := repositories.NovoUsuarioHorarioRepository(db)
+	tipoUsuarioRepo := repositories.NovoTipoUsuarioRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -50,7 +51,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService, usuarioHorarioService)
-	clinicaController := controllers.NovaClinicaController(clinicaService, configuracaoService)
+	clinicaController := controllers.NovaClinicaController(clinicaService, configuracaoService, usuarioService, tipoUsuarioRepo)
 	procedimentoController := controllers.NovoProcedimentoController(procedimentoService)
 	convenioController := controllers.NovoConvenioCoontroller(convenioService)
 	pacienteController := controllers.NovoPacienteController(pacienteService)

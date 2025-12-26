@@ -2,24 +2,33 @@ package controllers
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/ferrariwill/Clinicas/middleware"
 	"github.com/ferrariwill/Clinicas/models"
+	"github.com/ferrariwill/Clinicas/models/DTO"
 	dto "github.com/ferrariwill/Clinicas/models/DTO"
+	servicedto "github.com/ferrariwill/Clinicas/models/DTO/ServiceDTO"
+	"github.com/ferrariwill/Clinicas/repositories"
 	"github.com/ferrariwill/Clinicas/services"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type ClinicaController struct {
-	service           services.ClinicaService
-	configService     services.ConfiguracaoService
+	service         services.ClinicaService
+	configService   services.ConfiguracaoService
+	usuarioService  services.UsuarioService
+	tipoUsuarioRepo repositories.TipoUsuarioRepository
 }
 
-func NovaClinicaController(s services.ClinicaService, configService services.ConfiguracaoService) *ClinicaController {
+func NovaClinicaController(s services.ClinicaService, configService services.ConfiguracaoService, usuarioService services.UsuarioService, tipoUsuarioRepo repositories.TipoUsuarioRepository) *ClinicaController {
 	return &ClinicaController{
-		service:       s,
-		configService: configService,
+		service:         s,
+		configService:   configService,
+		usuarioService:  usuarioService,
+		tipoUsuarioRepo: tipoUsuarioRepo,
 	}
 }
 
@@ -35,18 +44,48 @@ func NovaClinicaController(s services.ClinicaService, configService services.Con
 // @Security BearerAuth
 // @Router /clinicas [post]
 func (cc *ClinicaController) Criar(c *gin.Context) {
-	var clinica models.Clinica
-	if err := c.ShouldBindJSON(&clinica); err != nil {
+	var clinicaDTO DTO.CriarClinicaDTO
+	if err := c.ShouldBindJSON(&clinicaDTO); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"erro": "Dados inválidos"})
 		return
 	}
+
+	clinica := servicedto.CriarClinicaDTO_CriarClinica(clinicaDTO)
 
 	if err := cc.service.CadastrarClinica(&clinica); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"clinica": clinica})
+	// Criar tipo usuário admin para a clínica
+	tipoUsuario := models.TipoUsuario{
+		Nome:      "Administrador",
+		Descricao: "Administrador da clínica",
+		ClinicaID: clinica.ID,
+	}
+	if err := cc.tipoUsuarioRepo.CriarTipoUsuario(&tipoUsuario); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"erro": "Erro ao criar tipo usuário"})
+		return
+	}
+
+	// Criar usuário admin
+	adminPassword := regexp.MustCompile(`\D`).ReplaceAllString(clinica.CNPJ, "")
+	senhaHash, _ := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	adminEmail := clinica.EmailResponsavel
+	usuario := models.Usuario{
+		Nome:          "Administrador",
+		Email:         adminEmail,
+		Senha:         string(senhaHash),
+		Ativo:         true,
+		ClinicaID:     clinica.ID,
+		TipoUsuarioID: tipoUsuario.ID,
+	}
+	if err := cc.usuarioService.CriarUsuario(&usuario, clinica.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"erro": "Erro ao criar usuário admin"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"clinica": clinica, "usuario_admin": gin.H{"email": adminEmail, "senha": adminPassword}})
 }
 
 // @Summary Listar clínicas
@@ -145,25 +184,25 @@ func (cc *ClinicaController) Reativar(c *gin.Context) {
 // @Router /clinicas/{id}/configuracoes [get]
 func (cc *ClinicaController) BuscarConfiguracoes(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	
+
 	// Verificar se usuário tem acesso à clínica
 	usuarioClinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
 		return
 	}
-	
+
 	if usuarioClinicaID != uint(id) {
 		c.JSON(http.StatusForbidden, gin.H{"erro": "Acesso negado"})
 		return
 	}
-	
+
 	config, err := cc.configService.BuscarConfiguracao(uint(id))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, config)
 }
 
@@ -181,30 +220,30 @@ func (cc *ClinicaController) BuscarConfiguracoes(c *gin.Context) {
 // @Router /clinicas/{id}/configuracoes [put]
 func (cc *ClinicaController) AtualizarConfiguracoes(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	
+
 	// Verificar se usuário tem acesso à clínica
 	usuarioClinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
 		return
 	}
-	
+
 	if usuarioClinicaID != uint(id) {
 		c.JSON(http.StatusForbidden, gin.H{"erro": "Acesso negado"})
 		return
 	}
-	
+
 	var req dto.ConfiguracaoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"erro": "Dados inválidos"})
 		return
 	}
-	
+
 	config, err := cc.configService.AtualizarConfiguracao(uint(id), &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, config)
 }
