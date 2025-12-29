@@ -8,6 +8,7 @@ import (
 type TelaService interface {
 	CriarTela(t *models.Tela) error
 	BuscarTelaPorID(id int) (*models.Tela, error)
+	BuscarTelaPorRota(rota string) (*models.Tela, error)
 	ListarTelas() ([]*models.Tela, error)
 	ListarTelasPorAssinatura(assinaturaID int) ([]*models.Tela, error)
 	AtualizarTela(t *models.Tela) error
@@ -30,6 +31,10 @@ func (s *telaService) CriarTela(t *models.Tela) error {
 
 func (s *telaService) BuscarTelaPorID(id int) (*models.Tela, error) {
 	return s.telaRepository.BuscarTelaPorID(id)
+}
+
+func (s *telaService) BuscarTelaPorRota(rota string) (*models.Tela, error) {
+	return s.telaRepository.BuscarTelaPorRota(rota)
 }
 
 func (s *telaService) ListarTelas() ([]*models.Tela, error) {

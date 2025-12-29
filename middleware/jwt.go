@@ -33,9 +33,7 @@ func ExtrairDoToken[T any](c *gin.Context, chave string) (T, error) {
 	}
 
 	// Remove "Bearer " se existir
-	if strings.HasPrefix(tokenString, "Bearer ") {
-		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-	}
+	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 
 	// Faz o parse do token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -62,6 +60,10 @@ func ExtrairDoToken[T any](c *gin.Context, chave string) (T, error) {
 			case int64:
 				if num, ok := valor.(float64); ok {
 					return any(int64(num)).(T), nil
+				}
+			case uint:
+				if num, ok := valor.(float64); ok {
+					return any(uint(num)).(T), nil
 				}
 			case string:
 				if str, ok := valor.(string); ok {

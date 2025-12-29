@@ -13,10 +13,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 	validacaoAdm := middleware.AutenticadoAdmin()
 
-	//Inicialização do middleware de permissao de acesso a telas
+	//Inicialização do middleware de permissao de acesso a telas (antigo sistema)
 	planoTelaRepo := repositories.NovoPlanoTelaRepository(db)
 	planoTelaSevice := services.NovoPlanoTelaService(planoTelaRepo)
-	verificarPermissao := middleware.NovaVerificacaoTelaMiddleware(planoTelaSevice)
 
 	//Inicializacao de repositorios
 	usurioRepo := repositories.NovoUsuarioRepository(db)
@@ -33,6 +32,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	configuracaoRepo := repositories.NovaConfiguracaoRepository(db)
 	usuarioHorarioRepo := repositories.NovoUsuarioHorarioRepository(db)
 	tipoUsuarioRepo := repositories.NovoTipoUsuarioRepository(db)
+	permissaoTelaRepo := repositories.NovoPermissaoTelaRepository(db)
 
 	//Inicializacao de services
 	authService := services.NovoAuthService(usurioRepo, tokenRepo)
@@ -47,7 +47,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	agendaService := services.NovaAgendaService(agendaRepo)
 	dashboardService := services.NovoDashboardService(dashboardRepo, pacienteRepo, usurioRepo, procedimentoRepo, agendaRepo)
 	configuracaoService := services.NovaConfiguracaoService(configuracaoRepo)
+	tipoUsuarioService := services.NovoTipoUsuarioService(tipoUsuarioRepo)
+	permissaoTelaService := services.NovoPermissaoTelaService(permissaoTelaRepo, telaService, tipoUsuarioService)
 	usuarioHorarioService := services.NovoUsuarioHorarioService(usuarioHorarioRepo)
+
+	//Inicialização do middleware de permissao por tipo de usuário
+	verificarPermissaoTipoUsuario := middleware.NovaVerificacaoTipoUsuarioMiddleware(permissaoTelaService)
 
 	//Inicializacao de controllers
 	usuarioController := controllers.NovoUsuarioController(usuarioService, usuarioHorarioService)
@@ -57,7 +62,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	pacienteController := controllers.NovoPacienteController(pacienteService)
 	agendaController := controllers.NovaAgendaController(agendaService)
 	dashboardController := controllers.NovoDashboardController(dashboardService)
-	financeiroController := controllers.NovoFinanceiroController()
+	financeiroController := controllers.NovoFinanceiroController(permissaoTelaService)
+	tipoUsuarioController := controllers.NovoTipoUsuarioController(tipoUsuarioService)
+	permissaoTelaController := controllers.NovoPermissaoTelaController(permissaoTelaService)
 	adminController := controllers.NovoAdminController(planoService,
 		telaService,
 		planoTelaSevice,
@@ -151,7 +158,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		procedimento.PUT("/:id/reativar", procedimentoController.Reativar)
 	}
 
-	financeiro := r.Group("/financeiro", middleware.Autenticado(), verificarPermissao.VerificaPermissaoTela)
+	financeiro := r.Group("/financeiro", middleware.Autenticado(), verificarPermissaoTipoUsuario.VerificaPermissaoTipoUsuario)
 	{
 		financeiro.GET("/abrir", financeiroController.Abrir)
 	}
@@ -187,6 +194,21 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		//Clinicas
 		admin.GET("/clinicas", clinicaController.Listar)
+
+		//Tipos de Usuário
+		admin.POST("/tipos-usuario", tipoUsuarioController.Criar)
+		admin.GET("/tipos-usuario", tipoUsuarioController.Listar)
+		admin.GET("/tipos-usuario/:id", tipoUsuarioController.Buscar)
+		admin.PUT("/tipos-usuario/:id", tipoUsuarioController.Atualizar)
+		admin.DELETE("/tipos-usuario/:id", tipoUsuarioController.Desativar)
+		admin.PUT("/tipos-usuario/:id/reativar", tipoUsuarioController.Reativar)
+
+		//Permissões de Tela
+		admin.POST("/permissoes-tela", permissaoTelaController.Associar)
+		admin.DELETE("/permissoes-tela/:tipo_usuario_id/:tela_id", permissaoTelaController.Desassociar)
+		admin.GET("/permissoes-tela/tipo-usuario/:tipo_usuario_id", permissaoTelaController.ListarTelasPorTipoUsuario)
+		admin.GET("/permissoes-tela/tela/:tela_id", permissaoTelaController.ListarTiposUsuarioPorTela)
+		admin.GET("/permissoes-tela/verificar/:tipo_usuario_id/:tela_id", permissaoTelaController.VerificarPermissao)
 	}
 
 }

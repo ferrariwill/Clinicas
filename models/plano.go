@@ -10,5 +10,5 @@ type Plano struct {
 	LimiteUsuarios int          `json:"limite_usuarios"`
 	Ativo          bool         `json:"ativo"`
 	Assinaturas    []Assinatura `json:"assinaturas" gorm:"foreignKey:PlanoID;constraint:OnDelete:CASCADE"`
-	Telas          []Tela       `json:"telas" gorm:"foreignKey:PlanoID;constraint:OnDelete:CASCADE"`
+	Telas          []Tela       `json:"telas" gorm:"many2many:plano_telas;"`
 }

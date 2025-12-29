@@ -34,7 +34,7 @@ func (r *agendaRepository) Listar(clinicaID uint) ([]models.Agenda, error) {
 		Preload("Usuario").
 		Preload("Procedimento").
 		Preload("Convenio").
-		Preload("Status").
+		Preload("StatusAgendamento").
 		Where("clinica_id = ?", clinicaID).
 		Find(&agendas).Error
 	return agendas, err
@@ -114,7 +114,7 @@ func (r *agendaRepository) HorariosDisponiveis(usuarioID, clinicaID, procediment
 		if h.Add(time.Duration(intervalo) * time.Minute).After(fimCompleto) {
 			break
 		}
-		
+
 		if !ocupados[h] {
 			disponiveis = append(disponiveis, h)
 		}

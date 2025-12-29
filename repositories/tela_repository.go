@@ -8,6 +8,7 @@ import (
 type TelaRepository interface {
 	CriarTela(t *models.Tela) error
 	BuscarTelaPorID(id int) (*models.Tela, error)
+	BuscarTelaPorRota(rota string) (*models.Tela, error)
 	ListarTelas() ([]*models.Tela, error)
 	ListarTelasPorAssinatura(assinaturaID int) ([]*models.Tela, error)
 	AtualizarTela(t *models.Tela) error
@@ -30,6 +31,12 @@ func (r *telaRepository) CriarTela(t *models.Tela) error {
 func (r *telaRepository) BuscarTelaPorID(id int) (*models.Tela, error) {
 	var tela models.Tela
 	err := r.db.First(&tela, id).Error
+	return &tela, err
+}
+
+func (r *telaRepository) BuscarTelaPorRota(rota string) (*models.Tela, error) {
+	var tela models.Tela
+	err := r.db.Where("rota = ?", rota).First(&tela).Error
 	return &tela, err
 }
 

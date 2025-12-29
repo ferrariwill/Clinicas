@@ -23,6 +23,7 @@ func RunMigrations(db *gorm.DB) {
 		&models.Agenda{},
 		&models.ClinicaConfiguracao{},
 		&models.UsuarioHorario{},
+		&models.PermissaoTela{},
 	)
 
 	if err != nil {

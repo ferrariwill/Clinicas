@@ -597,6 +597,477 @@ info:
   title: API Clínicas
   version: "1.0"
 paths:
+  /admin/assinaturas:
+    get:
+      description: Lista todas as assinaturas
+      parameters:
+      - description: Filtrar por ativo
+        in: query
+        name: ativo
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar assinaturas
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Cria uma nova assinatura
+      parameters:
+      - description: Dados da assinatura
+        in: body
+        name: assinatura
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Criar assinatura
+      tags:
+      - Admin
+  /admin/permissoes-tela:
+    post:
+      consumes:
+      - application/json
+      description: Associa uma tela a um tipo de usuário (concede permissão)
+      parameters:
+      - description: tipo_usuario_id e tela_id
+        in: body
+        name: permissao
+        required: true
+        schema:
+          additionalProperties:
+            type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Associar tela a tipo de usuário
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/{tipo_usuario_id}/{tela_id}:
+    delete:
+      description: Remove a permissão de uma tela para um tipo de usuário
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: tipo_usuario_id
+        required: true
+        type: integer
+      - description: ID da tela
+        in: path
+        name: tela_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Desassociar tela de tipo de usuário
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/tela/{tela_id}:
+    get:
+      description: Lista todos os tipos de usuário que têm permissão para uma tela
+      parameters:
+      - description: ID da tela
+        in: path
+        name: tela_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar tipos de usuário por tela
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/tipo-usuario/{tipo_usuario_id}:
+    get:
+      description: Lista todas as telas que um tipo de usuário tem permissão
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: tipo_usuario_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar telas por tipo de usuário
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/verificar/{tipo_usuario_id}/{tela_id}:
+    get:
+      description: Verifica se um tipo de usuário tem permissão para uma tela
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: tipo_usuario_id
+        required: true
+        type: integer
+      - description: ID da tela
+        in: path
+        name: tela_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Verificar permissão
+      tags:
+      - Admin - Permissões de Tela
+  /admin/tipos-usuario:
+    get:
+      description: Lista todos os tipos de usuário de uma clínica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar tipos de usuário
+      tags:
+      - Admin - Tipos de Usuário
+    post:
+      consumes:
+      - application/json
+      description: Cria um novo tipo de usuário para uma clínica
+      parameters:
+      - description: Dados do tipo de usuário
+        in: body
+        name: tipo_usuario
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Criar tipo de usuário
+      tags:
+      - Admin - Tipos de Usuário
+  /admin/tipos-usuario/{id}:
+    delete:
+      description: Desativa um tipo de usuário
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Desativar tipo de usuário
+      tags:
+      - Admin - Tipos de Usuário
+    get:
+      description: Busca um tipo de usuário por ID
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Buscar tipo de usuário
+      tags:
+      - Admin - Tipos de Usuário
+    put:
+      consumes:
+      - application/json
+      description: Atualiza um tipo de usuário
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dados atualizados
+        in: body
+        name: tipo_usuario
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Atualizar tipo de usuário
+      tags:
+      - Admin - Tipos de Usuário
+  /admin/tipos-usuario/{id}/reativar:
+    put:
+      description: Reativa um tipo de usuário
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reativar tipo de usuário
+      tags:
+      - Admin - Tipos de Usuário
   /auth/alterar-senha:
     put:
       consumes:

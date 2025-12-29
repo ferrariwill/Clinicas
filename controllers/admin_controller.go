@@ -38,7 +38,7 @@ func NovoAdminController(planoService services.PlanoService,
 // @Tags Admin
 // @Accept json
 // @Produce json
-// @Param assinatura body dto.CriarAssinaturaDTO true "Dados da assinatura"
+// @Param assinatura body map[string]interface{} true "Dados da assinatura"
 // @Success 201 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
@@ -71,7 +71,7 @@ func (ac AdminController) CriarAssinatura(c *gin.Context) {
 // @Tags Admin
 // @Produce json
 // @Param ativo query bool false "Filtrar por ativo"
-// @Success 200 {array} models.Assinatura
+// @Success 200 {array} map[string]interface{}
 // @Failure 500 {object} map[string]string
 // @Security BearerAuth
 // @Router /admin/assinaturas [get]
