@@ -1,6 +1,8 @@
 services:
+  # 1. Banco de Dados PostgreSQL
   db:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: clinicas_db
     restart: always
     environment:
       POSTGRES_USER: clinicas_user
@@ -10,18 +12,48 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    # Garante que o banco está pronto para receber conexões
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinicas_user -d Clinicas"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  backend:
-    build: .
+  # 2. Backend (Golang)
+  api:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: clinicas_api
+    restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
+      # O host 'db' refere-se ao nome do serviço acima
       DB_DSN: host=db user=clinicas_user password=clinicas_pass dbname=Clinicas port=5432 sslmode=disable
-    volumes:
-      - .:/app
-    command: ["./main"]
+      JWT_SECRET: sua_chave_secreta_fallback_123
+      PORT: 8080
+      GIN_MODE: release
+    # Executa migrações (seeds) e depois inicia o binário
+    command: ["sh", "-c", "./main --migrate && ./main"]
+
+  # 3. Frontend (Next.js)
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: clinicas_front
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    environment:
+      # URL que o seu NAVEGADOR usará para falar com a API
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
 
 volumes:
   pgdata:

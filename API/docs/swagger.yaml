@@ -1,0 +1,2148 @@
+basePath: /
+definitions:
+  controllers.AgendaRequest:
+    properties:
+      convenio_id:
+        example: 1
+        type: integer
+      data_hora:
+        example: "2024-01-15T10:00:00Z"
+        type: string
+      observacoes:
+        example: Paciente com alergia
+        type: string
+      paciente_id:
+        example: 1
+        type: integer
+      procedimento_id:
+        example: 1
+        type: integer
+      usuario_id:
+        example: 1
+        type: integer
+    required:
+    - data_hora
+    - paciente_id
+    - procedimento_id
+    - usuario_id
+    type: object
+  controllers.AgendaResponse:
+    properties:
+      clinica_id:
+        example: 1
+        type: integer
+      convenio_id:
+        example: 1
+        type: integer
+      data_hora:
+        example: "2024-01-15T10:00:00Z"
+        type: string
+      id:
+        example: 1
+        type: integer
+      observacoes:
+        example: Paciente com alergia
+        type: string
+      paciente_id:
+        example: 1
+        type: integer
+      procedimento_id:
+        example: 1
+        type: integer
+      status_id:
+        example: 1
+        type: integer
+      usuario_id:
+        example: 1
+        type: integer
+    type: object
+  controllers.AgendamentoHojeResponse:
+    properties:
+      horario:
+        example: "10:00"
+        type: string
+      id:
+        example: 1
+        type: integer
+      observacoes:
+        example: Paciente com alergia
+        type: string
+      paciente_nome:
+        example: Maria Silva
+        type: string
+      procedimento_nome:
+        example: Consulta Médica
+        type: string
+      status:
+        example: Agendado
+        type: string
+      usuario_nome:
+        example: Dr. João
+        type: string
+    type: object
+  controllers.AgendamentoResumo:
+    properties:
+      data_hora:
+        example: 2024-01-15 10:00
+        type: string
+      id:
+        example: 1
+        type: integer
+      paciente:
+        example: Maria Silva
+        type: string
+      procedimento:
+        example: Consulta
+        type: string
+    type: object
+  controllers.AlterarSenhaRequest:
+    properties:
+      nova_senha:
+        example: novaSenha456
+        type: string
+      senha:
+        example: senhaAtual123
+        type: string
+    required:
+    - nova_senha
+    - senha
+    type: object
+  controllers.AtualizarProntuarioRequest:
+    properties:
+      conteudo:
+        type: string
+      titulo:
+        type: string
+    required:
+    - conteudo
+    - titulo
+    type: object
+  controllers.AtualizarStatusRequest:
+    properties:
+      status_id:
+        example: 2
+        type: integer
+    required:
+    - status_id
+    type: object
+  controllers.ClinicaRequest:
+    properties:
+      cnpj:
+        example: 12.345.678/0001-90
+        type: string
+      email:
+        example: contato@clinica.com
+        type: string
+      endereco:
+        example: Rua das Flores, 123
+        type: string
+      nome:
+        example: Clínica São João
+        type: string
+      telefone:
+        example: (11) 99999-9999
+        type: string
+    required:
+    - cnpj
+    - email
+    - endereco
+    - nome
+    - telefone
+    type: object
+  controllers.ClinicaResponse:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      cnpj:
+        example: 12.345.678/0001-90
+        type: string
+      email:
+        example: contato@clinica.com
+        type: string
+      endereco:
+        example: Rua das Flores, 123
+        type: string
+      id:
+        example: 1
+        type: integer
+      nome:
+        example: Clínica São João
+        type: string
+      telefone:
+        example: (11) 99999-9999
+        type: string
+    type: object
+  controllers.ConfiguracaoRequest:
+    properties:
+      email_notificacao:
+        example: contato@clinica.com
+        type: string
+      funciona_domingo:
+        example: false
+        type: boolean
+      horario_fim_domingo:
+        example: ""
+        type: string
+      horario_fim_sabado:
+        example: "12:00"
+        type: string
+      horario_fim_semana:
+        example: "18:00"
+        type: string
+      horario_inicio_domingo:
+        example: ""
+        type: string
+      horario_inicio_sabado:
+        example: "08:00"
+        type: string
+      horario_inicio_semana:
+        example: "08:00"
+        type: string
+      intervalo_consulta:
+        example: 30
+        type: integer
+      limite_agendamentos_dia:
+        example: 50
+        type: integer
+      mensagem_boas_vindas:
+        example: Bem-vindo à nossa clínica!
+        type: string
+      permite_agendamento_fds:
+        example: false
+        type: boolean
+      telefone_whatsapp:
+        example: "11999999999"
+        type: string
+      tempo_antecedencia:
+        example: 24
+        type: integer
+    type: object
+  controllers.ConfiguracaoResponse:
+    properties:
+      clinica_id:
+        example: 1
+        type: integer
+      email_notificacao:
+        example: contato@clinica.com
+        type: string
+      funciona_domingo:
+        example: false
+        type: boolean
+      horario_fim_domingo:
+        example: ""
+        type: string
+      horario_fim_sabado:
+        example: "12:00"
+        type: string
+      horario_fim_semana:
+        example: "18:00"
+        type: string
+      horario_inicio_domingo:
+        example: ""
+        type: string
+      horario_inicio_sabado:
+        example: "08:00"
+        type: string
+      horario_inicio_semana:
+        example: "08:00"
+        type: string
+      id:
+        example: 1
+        type: integer
+      intervalo_consulta:
+        example: 30
+        type: integer
+      limite_agendamentos_dia:
+        example: 50
+        type: integer
+      mensagem_boas_vindas:
+        example: Bem-vindo à nossa clínica!
+        type: string
+      permite_agendamento_fds:
+        example: false
+        type: boolean
+      telefone_whatsapp:
+        example: "11999999999"
+        type: string
+      tempo_antecedencia:
+        example: 24
+        type: integer
+    type: object
+  controllers.CriarProntuarioRequest:
+    properties:
+      conteudo:
+        example: Paciente evolui bem.
+        type: string
+      paciente_id:
+        example: 1
+        type: integer
+      titulo:
+        example: Evolução
+        type: string
+    required:
+    - conteudo
+    - paciente_id
+    - titulo
+    type: object
+  controllers.DashboardResponse:
+    properties:
+      agendamentos_hoje:
+        example: 12
+        type: integer
+      agendamentos_semana:
+        example: 45
+        type: integer
+      pacientes_ativos:
+        example: 140
+        type: integer
+      proximos_agendamentos:
+        items:
+          $ref: '#/definitions/controllers.AgendamentoResumo'
+        type: array
+      receita_mes:
+        example: 15000.5
+        type: number
+      total_pacientes:
+        example: 150
+        type: integer
+      total_procedimentos:
+        example: 25
+        type: integer
+      total_usuarios:
+        example: 5
+        type: integer
+    type: object
+  controllers.DefinirHorariosRequest:
+    properties:
+      horarios:
+        items:
+          $ref: '#/definitions/controllers.UsuarioHorarioRequest'
+        type: array
+    required:
+    - horarios
+    type: object
+  controllers.ErrorResponse:
+    properties:
+      error:
+        example: Erro na operação
+        type: string
+    type: object
+  controllers.EsqueciSenhaRequest:
+    properties:
+      email:
+        example: usuario@exemplo.com
+        type: string
+    required:
+    - email
+    type: object
+  controllers.EstatisticaMensal:
+    properties:
+      mes:
+        example: 2024-01
+        type: string
+      total:
+        example: 25
+        type: integer
+      valor:
+        example: 5000
+        type: number
+    type: object
+  controllers.EstatisticasResponse:
+    properties:
+      agendamentos_por_mes:
+        items:
+          $ref: '#/definitions/controllers.EstatisticaMensal'
+        type: array
+      pacientes_por_mes:
+        items:
+          $ref: '#/definitions/controllers.EstatisticaMensal'
+        type: array
+      procedimentos_populares:
+        items:
+          $ref: '#/definitions/controllers.ProcedimentoPopular'
+        type: array
+      receita_por_mes:
+        items:
+          $ref: '#/definitions/controllers.EstatisticaMensal'
+        type: array
+    type: object
+  controllers.LoginRequest:
+    properties:
+      email:
+        example: usuario@exemplo.com
+        type: string
+      senha:
+        example: "123456"
+        type: string
+    required:
+    - email
+    - senha
+    type: object
+  controllers.LoginResponse:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      usuario:
+        $ref: '#/definitions/controllers.UsuarioInfo'
+    type: object
+  controllers.MessageResponse:
+    properties:
+      message:
+        example: Operação realizada com sucesso
+        type: string
+    type: object
+  controllers.MetricasOperacionaisSwagger:
+    properties:
+      agendamentos_considerados:
+        example: 120
+        type: integer
+      faturamento:
+        example: 12500.5
+        type: number
+      periodo_fim:
+        example: "2026-05-01"
+        type: string
+      periodo_inicio:
+        example: "2026-04-01"
+        type: string
+      taxa_no_show_percentual:
+        example: 6.67
+        type: number
+      total_faltas:
+        example: 8
+        type: integer
+    type: object
+  controllers.PacienteRequest:
+    properties:
+      cpf:
+        example: 123.456.789-00
+        type: string
+      data_nasc:
+        example: "1990-01-01"
+        type: string
+      email:
+        example: maria@exemplo.com
+        type: string
+      endereco:
+        example: Rua das Flores, 123
+        type: string
+      nome:
+        example: Maria Silva
+        type: string
+      telefone:
+        example: (11) 99999-9999
+        type: string
+    required:
+    - cpf
+    - email
+    - nome
+    - telefone
+    type: object
+  controllers.PacienteResponse:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      clinica_id:
+        example: 1
+        type: integer
+      cpf:
+        example: 123.456.789-00
+        type: string
+      data_nasc:
+        example: "1990-01-01"
+        type: string
+      email:
+        example: maria@exemplo.com
+        type: string
+      endereco:
+        example: Rua das Flores, 123
+        type: string
+      id:
+        example: 1
+        type: integer
+      nome:
+        example: Maria Silva
+        type: string
+      telefone:
+        example: (11) 99999-9999
+        type: string
+    type: object
+  controllers.ProcedimentoPopular:
+    properties:
+      nome:
+        example: Consulta Médica
+        type: string
+      total:
+        example: 45
+        type: integer
+    type: object
+  controllers.ProcedimentoRequest:
+    properties:
+      descricao:
+        example: Consulta médica geral
+        type: string
+      duracao:
+        example: 30
+        type: integer
+      nome:
+        example: Consulta Médica
+        type: string
+      valor:
+        example: 150
+        type: number
+    required:
+    - nome
+    - valor
+    type: object
+  controllers.ProcedimentoResponse:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      clinica_id:
+        example: 1
+        type: integer
+      descricao:
+        example: Consulta médica geral
+        type: string
+      duracao:
+        example: 30
+        type: integer
+      id:
+        example: 1
+        type: integer
+      nome:
+        example: Consulta Médica
+        type: string
+      valor:
+        example: 150
+        type: number
+    type: object
+  controllers.ProntuarioRegistroSwagger:
+    properties:
+      clinica_id:
+        example: 1
+        type: integer
+      conteudo:
+        example: '...'
+        type: string
+      created_at:
+        example: "2026-04-05T10:00:00Z"
+        type: string
+      id:
+        example: 1
+        type: integer
+      paciente_id:
+        example: 1
+        type: integer
+      profissional_id:
+        example: 2
+        type: integer
+      titulo:
+        example: Evolução
+        type: string
+    type: object
+  controllers.RedefinirSenhaRequest:
+    properties:
+      nova_senha:
+        example: novaSenha123
+        type: string
+      token:
+        example: abc123token
+        type: string
+    required:
+    - nova_senha
+    - token
+    type: object
+  controllers.UsuarioHorarioRequest:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      dia_semana:
+        example: 1
+        maximum: 6
+        minimum: 0
+        type: integer
+      horario_fim:
+        example: "18:00"
+        type: string
+      horario_inicio:
+        example: "08:00"
+        type: string
+    required:
+    - dia_semana
+    - horario_fim
+    - horario_inicio
+    type: object
+  controllers.UsuarioHorarioResponse:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      dia_semana:
+        example: 1
+        type: integer
+      dia_semana_texto:
+        example: Segunda-feira
+        type: string
+      horario_fim:
+        example: "18:00"
+        type: string
+      horario_inicio:
+        example: "08:00"
+        type: string
+      id:
+        example: 1
+        type: integer
+      usuario_id:
+        example: 1
+        type: integer
+    type: object
+  controllers.UsuarioInfo:
+    properties:
+      clinica_id:
+        example: 1
+        type: integer
+      email:
+        example: joao@exemplo.com
+        type: string
+      id:
+        example: 1
+        type: integer
+      nome:
+        example: João Silva
+        type: string
+      papel:
+        example: MEDICO
+        type: string
+      tipo_usuario_id:
+        example: 1
+        type: integer
+    type: object
+  controllers.UsuarioRequest:
+    properties:
+      email:
+        example: joao@exemplo.com
+        type: string
+      nome:
+        example: João Silva
+        type: string
+      senha:
+        example: "123456"
+        type: string
+      tipo_usuario_id:
+        example: 1
+        type: integer
+    required:
+    - email
+    - nome
+    - senha
+    - tipo_usuario_id
+    type: object
+  controllers.UsuarioResponse:
+    properties:
+      ativo:
+        example: true
+        type: boolean
+      clinica_id:
+        example: 1
+        type: integer
+      email:
+        example: joao@exemplo.com
+        type: string
+      id:
+        example: 1
+        type: integer
+      nome:
+        example: João Silva
+        type: string
+      tipo_usuario_id:
+        example: 1
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API multiclínica com isolamento por tenant (clinic_id), RBAC por papel
+    (ADM_GERAL, DONO, MEDICO, SECRETARIA), agendamento com validação de conflitos,
+    prontuário com imutabilidade após 24h, auditoria LGPD e métricas de faturamento
+    e no-show.
+  title: API White Label — Clínicas
+  version: "1.0"
+paths:
+  /admin/assinaturas:
+    get:
+      description: Lista todas as assinaturas
+      parameters:
+      - description: Filtrar por ativo
+        in: query
+        name: ativo
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar assinaturas
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Cria uma nova assinatura
+      parameters:
+      - description: Dados da assinatura
+        in: body
+        name: assinatura
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Criar assinatura
+      tags:
+      - Admin
+  /admin/permissoes-tela:
+    post:
+      consumes:
+      - application/json
+      description: Associa uma tela a um tipo de usuário (concede permissão)
+      parameters:
+      - description: tipo_usuario_id e tela_id
+        in: body
+        name: permissao
+        required: true
+        schema:
+          additionalProperties:
+            type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Associar tela a tipo de usuário
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/{tipo_usuario_id}/{tela_id}:
+    delete:
+      description: Remove a permissão de uma tela para um tipo de usuário
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: tipo_usuario_id
+        required: true
+        type: integer
+      - description: ID da tela
+        in: path
+        name: tela_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Desassociar tela de tipo de usuário
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/tela/{tela_id}:
+    get:
+      description: Lista todos os tipos de usuário que têm permissão para uma tela
+      parameters:
+      - description: ID da tela
+        in: path
+        name: tela_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar tipos de usuário por tela
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/tipo-usuario/{tipo_usuario_id}:
+    get:
+      description: Lista todas as telas que um tipo de usuário tem permissão
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: tipo_usuario_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar telas por tipo de usuário
+      tags:
+      - Admin - Permissões de Tela
+  /admin/permissoes-tela/verificar/{tipo_usuario_id}/{tela_id}:
+    get:
+      description: Verifica se um tipo de usuário tem permissão para uma tela
+      parameters:
+      - description: ID do tipo de usuário
+        in: path
+        name: tipo_usuario_id
+        required: true
+        type: integer
+      - description: ID da tela
+        in: path
+        name: tela_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Verificar permissão
+      tags:
+      - Admin - Permissões de Tela
+  /admin/tipos-usuario:
+    get:
+      description: Lista todos os tipos de usu?rio de uma cl?nica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar tipos de usu?rio
+      tags:
+      - Admin - Tipos de Usu?rio
+    post:
+      consumes:
+      - application/json
+      description: Cria um novo tipo de usu?rio para uma cl?nica
+      parameters:
+      - description: Dados do tipo de usu?rio
+        in: body
+        name: tipo_usuario
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Criar tipo de usu?rio
+      tags:
+      - Admin - Tipos de Usu?rio
+  /admin/tipos-usuario/{id}:
+    delete:
+      description: Desativa um tipo de usu?rio
+      parameters:
+      - description: ID do tipo de usu?rio
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Desativar tipo de usu?rio
+      tags:
+      - Admin - Tipos de Usu?rio
+    get:
+      description: Busca um tipo de usu?rio por ID
+      parameters:
+      - description: ID do tipo de usu?rio
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Buscar tipo de usu?rio
+      tags:
+      - Admin - Tipos de Usu?rio
+    put:
+      consumes:
+      - application/json
+      description: Atualiza um tipo de usu?rio
+      parameters:
+      - description: ID do tipo de usu?rio
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dados atualizados
+        in: body
+        name: tipo_usuario
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Atualizar tipo de usu?rio
+      tags:
+      - Admin - Tipos de Usu?rio
+  /admin/tipos-usuario/{id}/reativar:
+    put:
+      description: Reativa um tipo de usu?rio
+      parameters:
+      - description: ID do tipo de usu?rio
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reativar tipo de usu?rio
+      tags:
+      - Admin - Tipos de Usu?rio
+  /auth/alterar-senha:
+    put:
+      consumes:
+      - application/json
+      description: Altera a senha do usuário autenticado
+      parameters:
+      - description: Dados para alterar senha
+        in: body
+        name: dados
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.AlterarSenhaRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Alterar senha
+      tags:
+      - Autenticação
+  /auth/esqueci-senha:
+    post:
+      consumes:
+      - application/json
+      description: Envia email para redefinição de senha
+      parameters:
+      - description: Email para redefinição
+        in: body
+        name: dados
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.EsqueciSenhaRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      summary: Esqueci minha senha
+      tags:
+      - Autenticação
+  /auth/redefinir-senha:
+    post:
+      consumes:
+      - application/json
+      description: Redefine a senha usando token recebido por email
+      parameters:
+      - description: Token e nova senha
+        in: body
+        name: dados
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.RedefinirSenhaRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      summary: Redefinir senha
+      tags:
+      - Autenticação
+  /clinicas:
+    get:
+      consumes:
+      - application/json
+      description: Lista todas as clínicas
+      parameters:
+      - description: Filtrar apenas clínicas ativas
+        in: query
+        name: ativas
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.ClinicaResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Listar clínicas
+      tags:
+      - Clínicas
+    post:
+      consumes:
+      - application/json
+      description: Cria uma nova clínica
+      parameters:
+      - description: Dados da clínica
+        in: body
+        name: clinica
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.ClinicaRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/controllers.ClinicaResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Criar clínica
+      tags:
+      - Clínicas
+  /clinicas/{id}/configuracoes:
+    get:
+      consumes:
+      - application/json
+      description: Retorna as configurações da clínica
+      parameters:
+      - description: ID da clínica
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.ConfiguracaoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Buscar configurações da clínica
+      tags:
+      - Clínicas
+    put:
+      consumes:
+      - application/json
+      description: Atualiza as configurações da clínica
+      parameters:
+      - description: ID da clínica
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dados da configuração
+        in: body
+        name: configuracao
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.ConfiguracaoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.ConfiguracaoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Atualizar configurações da clínica
+      tags:
+      - Clínicas
+  /clinicas/agenda:
+    get:
+      consumes:
+      - application/json
+      description: Lista todos os agendamentos da clínica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.AgendaResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Listar agendamentos
+      tags:
+      - Agenda
+    post:
+      consumes:
+      - application/json
+      description: Cria um novo agendamento na clínica
+      parameters:
+      - description: Dados do agendamento
+        in: body
+        name: agendamento
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.AgendaRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/controllers.AgendaResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Criar agendamento
+      tags:
+      - Agenda
+  /clinicas/agenda/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Atualiza o status de um agendamento
+      parameters:
+      - description: ID do agendamento
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Novo status
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.AtualizarStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Atualizar status do agendamento
+      tags:
+      - Agenda
+  /clinicas/agenda/horarios-disponiveis:
+    get:
+      consumes:
+      - application/json
+      description: Buscar horários disponíveis para agendamento
+      parameters:
+      - description: ID do usuário
+        in: query
+        name: usuario_id
+        required: true
+        type: integer
+      - description: ID do procedimento
+        in: query
+        name: procedimento_id
+        required: true
+        type: integer
+      - description: Data no formato YYYY-MM-DD
+        in: query
+        name: data
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Horários Disponíveis
+      tags:
+      - Agenda
+  /clinicas/prontuarios:
+    get:
+      parameters:
+      - description: ID do paciente
+        in: query
+        name: paciente_id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.ProntuarioRegistroSwagger'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Listar prontuário por paciente
+      tags:
+      - Prontuário
+    post:
+      consumes:
+      - application/json
+      description: Registra evolução clínica (dados sensíveis — auditoria LGPD).
+      parameters:
+      - description: Dados
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.CriarProntuarioRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/controllers.ProntuarioRegistroSwagger'
+      security:
+      - BearerAuth: []
+      summary: Criar registro de prontuário
+      tags:
+      - Prontuário
+  /clinicas/prontuarios/{id}:
+    put:
+      description: Permitido apenas até 24h após a criação.
+      parameters:
+      - description: ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dados
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.AtualizarProntuarioRequest'
+      responses: {}
+      security:
+      - BearerAuth: []
+      summary: Atualizar registro de prontuário
+      tags:
+      - Prontuário
+  /convenios:
+    post:
+      consumes:
+      - application/json
+      description: Cadastrar um novo convênio
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cadastrar Convênio
+      tags:
+      - Convênios
+  /convenios/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Atualizar um convênio existente
+      parameters:
+      - description: ID do convênio
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Atualizar Convênio
+      tags:
+      - Convênios
+  /dashboard:
+    get:
+      consumes:
+      - application/json
+      description: Retorna métricas gerais da clínica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.DashboardResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Dashboard principal
+      tags:
+      - Dashboard
+  /dashboard/agendamentos-hoje:
+    get:
+      consumes:
+      - application/json
+      description: Retorna os agendamentos do dia atual
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.AgendamentoHojeResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Agendamentos de hoje
+      tags:
+      - Dashboard
+  /dashboard/estatisticas:
+    get:
+      consumes:
+      - application/json
+      description: Retorna estatísticas básicas da clínica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.EstatisticasResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Estatísticas da clínica
+      tags:
+      - Dashboard
+  /dashboard/metricas-operacionais:
+    get:
+      description: Faturamento pela soma do valor dos procedimentos agendados no período
+        e taxa de absenteísmo (status Falta sobre agendamentos não cancelados).
+      parameters:
+      - default: primeiro dia do mês
+        description: Data inicial (YYYY-MM-DD)
+        in: query
+        name: inicio
+        type: string
+      - description: Último dia inclusivo do período (YYYY-MM-DD)
+        in: query
+        name: fim
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MetricasOperacionaisSwagger'
+      security:
+      - BearerAuth: []
+      summary: Métricas operacionais (faturamento e no-show)
+      tags:
+      - Dashboard
+  /financeiro/abrir:
+    get:
+      consumes:
+      - application/json
+      description: Abrir módulo financeiro
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Abrir Financeiro
+      tags:
+      - Financeiro
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Autentica um usuário e retorna um token JWT
+      parameters:
+      - description: Dados de login
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login de usuário
+      tags:
+      - Autenticação
+  /pacientes:
+    get:
+      consumes:
+      - application/json
+      description: Lista todos os pacientes da clínica
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.PacienteResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Listar pacientes
+      tags:
+      - Pacientes
+    post:
+      consumes:
+      - application/json
+      description: Cria um novo paciente na clínica
+      parameters:
+      - description: Dados do paciente
+        in: body
+        name: paciente
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.PacienteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Criar paciente
+      tags:
+      - Pacientes
+  /pacientes/{cpf}:
+    get:
+      consumes:
+      - application/json
+      description: Busca um paciente específico pelo CPF
+      parameters:
+      - description: CPF do paciente
+        in: path
+        name: cpf
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.PacienteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Buscar paciente por CPF
+      tags:
+      - Pacientes
+  /procedimentos:
+    get:
+      consumes:
+      - application/json
+      description: Lista todos os procedimentos da clínica
+      parameters:
+      - description: Filtrar apenas procedimentos ativos
+        in: query
+        name: ativas
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.ProcedimentoResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Listar procedimentos por clínica
+      tags:
+      - Procedimentos
+    post:
+      consumes:
+      - application/json
+      description: Cadastra um novo procedimento na clínica
+      parameters:
+      - description: Dados do procedimento
+        in: body
+        name: procedimento
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.ProcedimentoRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cadastrar procedimento
+      tags:
+      - Procedimentos
+  /usuarios:
+    get:
+      consumes:
+      - application/json
+      description: Lista todos os usuários da clínica
+      parameters:
+      - description: Filtrar apenas usuários ativos
+        in: query
+        name: ativos
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.UsuarioResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Listar usuários
+      tags:
+      - Usuários
+    post:
+      consumes:
+      - application/json
+      description: Cria um novo usuário na clínica
+      parameters:
+      - description: Dados do usuário
+        in: body
+        name: usuario
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UsuarioRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/controllers.UsuarioResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Criar usuário
+      tags:
+      - Usuários
+  /usuarios/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Desativa um usuário
+      parameters:
+      - description: ID do usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Desativar usuário
+      tags:
+      - Usuários
+    get:
+      consumes:
+      - application/json
+      description: Busca um usuário específico pelo ID
+      parameters:
+      - description: ID do usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.UsuarioResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Buscar usuário por ID
+      tags:
+      - Usuários
+    put:
+      consumes:
+      - application/json
+      description: Atualiza os dados de um usuário
+      parameters:
+      - description: ID do usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dados do usuário
+        in: body
+        name: usuario
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UsuarioRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.UsuarioResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Atualizar usuário
+      tags:
+      - Usuários
+  /usuarios/{id}/horarios:
+    get:
+      consumes:
+      - application/json
+      description: Retorna os horários de trabalho do usuário
+      parameters:
+      - description: ID do usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/controllers.UsuarioHorarioResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Buscar horários do usuário
+      tags:
+      - Usuários
+    put:
+      consumes:
+      - application/json
+      description: Define os horários de trabalho do usuário
+      parameters:
+      - description: ID do usuário
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Horários do usuário
+        in: body
+        name: horarios
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.DefinirHorariosRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Definir horários do usuário
+      tags:
+      - Usuários
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
