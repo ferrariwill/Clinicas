@@ -11,7 +11,6 @@ export const useAuth = () => {
     clinicaId,
     userRole,
     setUsuario,
-    clearAuth,
     setClinicaId,
     loadFromCookies,
     logout,
@@ -27,9 +26,10 @@ export const useAuth = () => {
       const response = await apiClient.login(email, senha);
       setUsuario(response.usuario, response.access_token);
       return { success: true, data: response };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string }
       const errorMessage =
-        error.message || "Erro ao fazer login. Tente novamente.";
+        err.message || "Erro ao fazer login. Tente novamente.";
       toast.error(errorMessage);
       return { success: false, error: errorMessage };
     }

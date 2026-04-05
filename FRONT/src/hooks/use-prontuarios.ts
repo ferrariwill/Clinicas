@@ -4,20 +4,16 @@ import type { ProntuarioRegistroSwagger, CriarProntuarioRequest, AtualizarProntu
 import { toast } from "sonner"
 
 export const useProntuariosPaciente = (pacienteId: string) => {
-  return useQuery<ProntuarioRegistroSwagger[]>(
-    ["prontuarios-paciente", pacienteId],
-    async () => {
+  return useQuery<ProntuarioRegistroSwagger[]>({
+    queryKey: ["prontuarios-paciente", pacienteId],
+    queryFn: async () => {
       const response = await apiClient.getProntuarios()
-      // Filter by patient ID - assuming the API returns all and we filter client-side
-      // In a real implementation, this should be done server-side
       const prontuarios = Array.isArray(response) ? response : response.prontuarios ?? []
       return prontuarios.filter((p: ProntuarioRegistroSwagger) => p.paciente_id === pacienteId)
     },
-    {
-      enabled: Boolean(pacienteId),
-      staleTime: 60 * 1000,
-    }
-  )
+    enabled: Boolean(pacienteId),
+    staleTime: 60 * 1000,
+  })
 }
 
 export const useCriarProntuario = () => {
@@ -31,8 +27,9 @@ export const useCriarProntuario = () => {
       toast.success("Prontuário criado com sucesso")
       queryClient.invalidateQueries({ queryKey: ["prontuarios-paciente"] })
     },
-    onError: (error: any) => {
-      toast.error(error?.message || "Erro ao criar prontuário")
+    onError: (error: unknown) => {
+      const err = error as { message?: string }
+      toast.error(err?.message || "Erro ao criar prontuário")
     },
   })
 }
@@ -48,8 +45,9 @@ export const useAtualizarProntuario = () => {
       toast.success("Prontuário atualizado com sucesso")
       queryClient.invalidateQueries({ queryKey: ["prontuarios-paciente"] })
     },
-    onError: (error: any) => {
-      toast.error(error?.message || "Erro ao atualizar prontuário")
+    onError: (error: unknown) => {
+      const err = error as { message?: string }
+      toast.error(err?.message || "Erro ao atualizar prontuário")
     },
   })
 }

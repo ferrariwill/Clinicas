@@ -12,21 +12,32 @@ import (
 
 func RunMigrations(db *gorm.DB) {
 	err := db.AutoMigrate(
+		// Sem dependências
 		&models.Clinica{},
-		&models.TipoUsuario{},
-		&models.Usuario{},
 		&models.Funcionalidade{},
+		&models.StatusAgendamento{},
+		&models.TokenRedifinicao{},
+		// Dependem de Clinica
+		&models.TipoUsuario{},
+		&models.Plano{},
+		&models.Tela{},
+		// Dependem de TipoUsuario / Clinica
+		&models.Usuario{},
 		&models.Permissao{},
+		&models.Assinatura{},
+		&models.PlanoTela{},
+		// Dependem de Clinica / Usuario
 		&models.Paciente{},
 		&models.Procedimento{},
 		&models.Convenio{},
-		&models.StatusAgendamento{},
-		&models.Agenda{},
 		&models.ClinicaConfiguracao{},
 		&models.UsuarioHorario{},
 		&models.PermissaoTela{},
-		&models.ProntuarioRegistro{},
 		&models.AuditLog{},
+		// Dependem de Paciente / Procedimento / Convenio
+		&models.ConvenioProcedimento{},
+		&models.Agenda{},
+		&models.ProntuarioRegistro{},
 	)
 
 	if err != nil {

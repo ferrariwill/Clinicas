@@ -58,11 +58,11 @@ export interface ClinicaResponse {
 }
 
 export interface ConfiguracaoRequest {
-  [key: string]: any;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 export interface ConfiguracaoResponse {
-  [key: string]: any;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 // Patient Types
@@ -273,7 +273,7 @@ export interface ErrorResponse {
   status: number;
   mensagem: string;
   erro?: string;
-  detalhes?: any;
+  detalhes?: string | Record<string, string>;
 }
 
 export interface MessageResponse {

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { apiClient } from "@/services/api-client"
+import { ClinicaResponse } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { Building2 } from "lucide-react"
 import { toast } from "sonner"
@@ -15,14 +16,9 @@ export const ClinicaSelector: React.FC<ClinicaSelectorProps> = ({
   onClinicaChange,
 }) => {
   const { userRole, clinicaId, changeClinica } = useAuth()
-  const [clinicas, setClinicas] = useState<any[]>([])
+  const [clinicas, setClinicas] = useState<ClinicaResponse[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-
-  // Only show for ADM_GERAL
-  if (userRole !== "ADM_GERAL") {
-    return null
-  }
 
   useEffect(() => {
     const loadClinicas = async () => {
@@ -30,7 +26,7 @@ export const ClinicaSelector: React.FC<ClinicaSelectorProps> = ({
       try {
         const data = await apiClient.getClinicas()
         setClinicas(Array.isArray(data) ? data : data.clinicas || [])
-      } catch (error) {
+      } catch {
         toast.error("Erro ao carregar clínicas")
       } finally {
         setIsLoading(false)
@@ -41,6 +37,11 @@ export const ClinicaSelector: React.FC<ClinicaSelectorProps> = ({
       loadClinicas()
     }
   }, [isOpen, clinicas.length])
+
+  // Only show for ADM_GERAL
+  if (userRole !== "ADM_GERAL") {
+    return null
+  }
 
   const selectedClinica = clinicas.find((c) => c.id === clinicaId)
 

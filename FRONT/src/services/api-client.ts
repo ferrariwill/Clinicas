@@ -4,7 +4,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import Cookies from "js-cookie";
-import { ErrorResponse } from "@/types/api";
+import { ErrorResponse, ClinicaRequest, PacienteRequest, AgendaRequest, CriarProntuarioRequest, AtualizarProntuarioRequest, ProcedimentoRequest, UsuarioRequest, UsuarioHorarioRequest, CriarLancamentoRequest, FiltrosFinanceiro } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -100,7 +100,7 @@ class ApiClient {
     return response.data;
   }
 
-  async criarClinica(data: any) {
+  async criarClinica(data: ClinicaRequest) {
     const response = await this.axiosInstance.post("/clinicas", data);
     return response.data;
   }
@@ -112,7 +112,7 @@ class ApiClient {
     return response.data;
   }
 
-  async atualizarConfiguracoes(clinicaId: string, data: any) {
+  async atualizarConfiguracoes(clinicaId: string, data: Record<string, string | number | boolean | null | undefined>) {
     const response = await this.axiosInstance.put(
       `/clinicas/${clinicaId}/configuracoes`,
       data
@@ -126,7 +126,7 @@ class ApiClient {
     return response.data;
   }
 
-  async criarPaciente(data: any) {
+  async criarPaciente(data: PacienteRequest) {
     const response = await this.axiosInstance.post("/pacientes", data);
     return response.data;
   }
@@ -142,7 +142,7 @@ class ApiClient {
     return response.data;
   }
 
-  async criarAgenda(data: any) {
+  async criarAgenda(data: AgendaRequest) {
     const response = await this.axiosInstance.post("/clinicas/agenda", data);
     return response.data;
   }
@@ -194,7 +194,7 @@ class ApiClient {
     return response.data;
   }
 
-  async criarProntuario(data: any) {
+  async criarProntuario(data: CriarProntuarioRequest) {
     const response = await this.axiosInstance.post(
       "/clinicas/prontuarios",
       data
@@ -202,7 +202,7 @@ class ApiClient {
     return response.data;
   }
 
-  async atualizarProntuario(prontuarioId: string, data: any) {
+  async atualizarProntuario(prontuarioId: string, data: AtualizarProntuarioRequest) {
     const response = await this.axiosInstance.put(
       `/clinicas/prontuarios/${prontuarioId}`,
       data
@@ -216,7 +216,7 @@ class ApiClient {
     return response.data;
   }
 
-  async criarProcedimento(data: any) {
+  async criarProcedimento(data: ProcedimentoRequest) {
     const response = await this.axiosInstance.post("/procedimentos", data);
     return response.data;
   }
@@ -227,12 +227,12 @@ class ApiClient {
     return response.data;
   }
 
-  async criarUsuario(data: any) {
+  async criarUsuario(data: UsuarioRequest) {
     const response = await this.axiosInstance.post("/usuarios", data);
     return response.data;
   }
 
-  async atualizarUsuario(usuarioId: string, data: any) {
+  async atualizarUsuario(usuarioId: string, data: Partial<UsuarioRequest>) {
     const response = await this.axiosInstance.put(`/usuarios/${usuarioId}`, data);
     return response.data;
   }
@@ -247,7 +247,7 @@ class ApiClient {
     return response.data;
   }
 
-  async definirHorariosUsuario(usuarioId: string, data: any) {
+  async definirHorariosUsuario(usuarioId: string, data: UsuarioHorarioRequest) {
     const response = await this.axiosInstance.put(
       `/usuarios/${usuarioId}/horarios`,
       data
@@ -295,20 +295,20 @@ class ApiClient {
     return response.data;
   }
 
-  async getLancamentosFinanceiros(filtros?: any) {
+  async getLancamentosFinanceiros(filtros?: FiltrosFinanceiro) {
     const response = await this.axiosInstance.get("/clinicas/financeiro", {
       params: filtros,
     });
     return response.data;
   }
 
-  async criarLancamentoFinanceiro(data: any) {
+  async criarLancamentoFinanceiro(data: CriarLancamentoRequest) {
     const response = await this.axiosInstance.post("/clinicas/financeiro", data);
     return response.data;
   }
 
   async getResumoFinanceiro(dataInicio?: string, dataFim?: string) {
-    const params: any = {};
+    const params: Record<string, string> = {};
     if (dataInicio) params.data_inicio = dataInicio;
     if (dataFim) params.data_fim = dataFim;
 

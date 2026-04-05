@@ -12,9 +12,10 @@ export const useDashboardMetrics = (clinicaId?: string) => {
       try {
         const data = await apiClient.getMetricasOperacionais(clinicaId)
         return data as MetricasOperacionais
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string }
         const errorMessage =
-          error?.message || "Erro ao carregar métricas da clínica"
+          err?.message || "Erro ao carregar métricas da clínica"
         toast.error(errorMessage)
         throw new Error(errorMessage)
       }
@@ -36,7 +37,7 @@ export const useResumoFinanceiroMes = (clinicaId?: string) => {
       try {
         const data = await apiClient.getResumoFinanceiro(dataInicio, dataFim)
         return data as ResumoFinanceiro
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Não fazer toast error aqui para não poluir a UI se houver erro
         console.error("Erro ao carregar resumo financeiro:", error)
         // Retornar valores padrão em caso de erro
@@ -59,9 +60,10 @@ export const useDashboard = (clinicaId?: string) => {
       try {
         const data = await apiClient.getDashboard()
         return data
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string }
         const errorMessage =
-          error?.message || "Erro ao carregar dashboard"
+          err?.message || "Erro ao carregar dashboard"
         toast.error(errorMessage)
         throw error
       }
@@ -78,9 +80,10 @@ export const useAgendamentosHoje = (clinicaId?: string) => {
       try {
         const data = await apiClient.getAgendamentosHoje()
         return data
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string }
         const errorMessage =
-          error?.message || "Erro ao carregar agendamentos de hoje"
+          err?.message || "Erro ao carregar agendamentos de hoje"
         toast.error(errorMessage)
         throw error
       }
@@ -97,9 +100,10 @@ export const useEstatisticas = (clinicaId?: string) => {
       try {
         const data = await apiClient.getEstatisticas()
         return data
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string }
         const errorMessage =
-          error?.message || "Erro ao carregar estatísticas"
+          err?.message || "Erro ao carregar estatísticas"
         toast.error(errorMessage)
         throw error
       }

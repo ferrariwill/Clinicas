@@ -61,10 +61,10 @@ export default function AgendaPage() {
   const criarAgenda = useCriarAgenda()
   const marcarFalta = useAtualizarStatusAgenda()
 
-  const profissionais: UsuarioResponse[] = profissionaisQuery.data ?? []
-  const pacientes: PacienteResponse[] = pacientesQuery.data ?? []
-  const procedimentos: ProcedimentoResponse[] = procedimentosQuery.data ?? []
-  const agendamentos: AgendaResponse[] = agendaQuery.data ?? []
+  const profissionais = (profissionaisQuery.data ?? []) as UsuarioResponse[]
+  const pacientes = (pacientesQuery.data ?? []) as PacienteResponse[]
+  const procedimentos = (procedimentosQuery.data ?? []) as ProcedimentoResponse[]
+  const agendamentos = (agendaQuery.data ?? []) as AgendaResponse[]
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -89,14 +89,15 @@ export default function AgendaPage() {
         data_horario,
       },
       {
-        onError: (error: any) => {
-          if (error?.status === 409) {
+        onError: (error: unknown) => {
+          const err = error as { status?: number; message?: string }
+          if (err?.status === 409) {
             toast.error(
               "Conflito de agenda: este profissional já possui um atendimento agendado neste horário."
             )
             return
           }
-          toast.error(error?.message || "Erro ao criar agendamento")
+          toast.error(err?.message || "Erro ao criar agendamento")
         },
         onSuccess: () => {
           setOpenDialog(false)
@@ -110,8 +111,9 @@ export default function AgendaPage() {
     marcarFalta.mutate(
       { agendaId, statusId: "FALTOU" },
       {
-        onError: (error: any) => {
-          toast.error(error?.message || "Erro ao marcar falta")
+        onError: (error: unknown) => {
+          const err = error as { message?: string }
+          toast.error(err?.message || "Erro ao marcar falta")
         },
       }
     )
@@ -299,7 +301,7 @@ export default function AgendaPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => agendaQuery.refetch()}
-                disabled={agendaQuery.isLoading}
+                disabled={agendaQuery.isPending}
                 className="inline-flex items-center gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -307,20 +309,20 @@ export default function AgendaPage() {
               </Button>
             </CardHeader>
             <CardContent>
-              {agendaQuery.isLoading && (
+              {agendaQuery.isPending && (
                 <div className="space-y-3">
                   <MetricCardSkeleton />
                   <MetricCardSkeleton />
                 </div>
               )}
 
-              {!agendaQuery.isLoading && agendamentos.length === 0 && (
+              {!agendaQuery.isPending && agendamentos.length === 0 && (
                 <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-600">
                   Nenhum agendamento encontrado nesta data.
                 </div>
               )}
 
-              {!agendaQuery.isLoading && agendamentos.length > 0 && (
+              {!agendaQuery.isPending && agendamentos.length > 0 && (
                 <div className="space-y-4">
                   {agendamentos.map((item) => (
                     <div key={item.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">

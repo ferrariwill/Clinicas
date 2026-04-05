@@ -1,21 +1,37 @@
 package routes
 
 import (
+	"os"
+	"strings"
+	"time"
 	_ "github.com/ferrariwill/Clinicas/API/internal/logger"
 
 	"github.com/ferrariwill/Clinicas/API/controllers"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	"github.com/ferrariwill/Clinicas/API/repositories"
 	"github.com/ferrariwill/Clinicas/API/services"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
-	validacaoAdm := middleware.AutenticadoAdmin()
+	// CORS — origens configuráveis via variável de ambiente CORS_ORIGINS
+	allowedOrigins := strings.Split(os.Getenv("CORS_ORIGINS"), ",")
+	if len(allowedOrigins) == 0 || allowedOrigins[0] == "" {
+		allowedOrigins = []string{"http://localhost:3000"}
+	}
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Clinic-ID"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
-	//Inicialização do middleware de permissao de acesso a telas (antigo sistema)
+	validacaoAdm := middleware.AutenticadoAdmin()
 	planoTelaRepo := repositories.NovoPlanoTelaRepository(db)
 	planoTelaSevice := services.NovoPlanoTelaService(planoTelaRepo)
 

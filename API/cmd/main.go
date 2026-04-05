@@ -30,7 +30,7 @@ func main() {
 
 	db := database.ConnectDB()
 
-	// Verificar se é para executar migrations
+	// Verificar se é para executar apenas migrations
 	if len(os.Args) > 1 && os.Args[1] == "--migrate" {
 		log.Println("Executando migrations...")
 		database.RunMigrations(db)
@@ -39,6 +39,7 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.HandleMethodNotAllowed = false
 
 	// Swagger endpoint
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

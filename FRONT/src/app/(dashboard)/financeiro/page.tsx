@@ -20,9 +20,7 @@ import {
   TrendingUp,
   TrendingDown,
   Download,
-  Calendar,
   Filter,
-  Eye,
   EyeOff
 } from "lucide-react"
 import { toast } from "sonner"
@@ -59,14 +57,16 @@ export default function FinanceiroPage() {
   const { data: resumo, isLoading: loadingResumo } = useResumoFinanceiro(filtros.dataInicio, filtros.dataFim)
   const criarLancamento = useCriarLancamento()
 
+  const lancamentosTyped = (lancamentos ?? []) as LancamentoFinanceiro[]
+
   // Filtrar lançamentos baseado nas permissões
-  const lancamentosFiltrados = lancamentos?.filter((lancamento: LancamentoFinanceiro) =>
+  const lancamentosFiltrados = lancamentosTyped.filter((lancamento: LancamentoFinanceiro) =>
     canViewLancamento(lancamento, usuario?.id || '', usuario?.tipo_usuario || '')
-  ) || []
+  )
 
   // Calcular totais visíveis baseado nas permissões
-  const totaisVisiveis = canViewFullFinancials(usuario?.tipo_usuario || '')
-    ? resumo
+  const totaisVisiveis: { totalEntradas: number; totalSaidas: number; saldoLiquido: number } = canViewFullFinancials(usuario?.tipo_usuario || '')
+    ? (resumo as { totalEntradas: number; totalSaidas: number; saldoLiquido: number }) || { totalEntradas: 0, totalSaidas: 0, saldoLiquido: 0 }
     : {
         totalEntradas: lancamentosFiltrados
           .filter((l: LancamentoFinanceiro) => l.tipo === 'RECEITA')
@@ -220,8 +220,8 @@ export default function FinanceiroPage() {
                   <Button type="button" variant="secondary" onClick={() => setOpenDialog(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={criarLancamento.isLoading}>
-                    {criarLancamento.isLoading ? "Salvando..." : "Salvar"}
+                  <Button type="submit" disabled={criarLancamento.isPending}>
+                    {criarLancamento.isPending ? "Salvando..." : "Salvar"}
                   </Button>
                 </div>
               </form>

@@ -4,39 +4,46 @@ import type { AgendaRequest, AgendaResponse, UsuarioResponse, PacienteResponse, 
 import { toast } from "sonner"
 
 export const useAgendaDia = (data: string, profissionalId?: string) => {
-  return useQuery<AgendaResponse[]>(
-    ["agenda-dia", data, profissionalId],
-    async () => {
+  return useQuery<AgendaResponse[]>({
+    queryKey: ["agenda-dia", data, profissionalId],
+    queryFn: async (): Promise<AgendaResponse[]> => {
       const result = await apiClient.getAgendamentosDia(data, profissionalId)
       return result
     },
-    {
-      enabled: Boolean(data),
-      staleTime: 60 * 1000,
-      retry: 1,
-    }
-  )
+    enabled: Boolean(data),
+    staleTime: 60 * 1000,
+    retry: 1,
+  })
 }
 
 export const usePacientes = () => {
-  return useQuery<PacienteResponse[]>(["pacientes"], async () => {
-    const response = await apiClient.getPacientes()
-    return Array.isArray(response) ? response : response.pacientes ?? []
+  return useQuery<PacienteResponse[]>({
+    queryKey: ["pacientes"],
+    queryFn: async (): Promise<PacienteResponse[]> => {
+      const response = await apiClient.getPacientes()
+      return (Array.isArray(response) ? response : response.pacientes ?? []) as PacienteResponse[]
+    },
   })
 }
 
 export const useProfissionais = () => {
-  return useQuery<UsuarioResponse[]>(["profissionais"], async () => {
-    const response = await apiClient.getUsuarios()
-    const usuarios = Array.isArray(response) ? response : response.usuarios ?? []
-    return usuarios.filter((usuario: UsuarioResponse) => usuario.tipo_usuario === "MEDICO")
+  return useQuery<UsuarioResponse[]>({
+    queryKey: ["profissionais"],
+    queryFn: async (): Promise<UsuarioResponse[]> => {
+      const response = await apiClient.getUsuarios()
+      const usuarios = Array.isArray(response) ? response : (response.usuarios ?? []) as UsuarioResponse[]
+      return usuarios.filter((usuario) => usuario.tipo_usuario === "MEDICO")
+    },
   })
 }
 
 export const useProcedimentos = () => {
-  return useQuery<ProcedimentoResponse[]>(["procedimentos"], async () => {
-    const response = await apiClient.getProcedimentos()
-    return Array.isArray(response) ? response : response.procedimentos ?? []
+  return useQuery<ProcedimentoResponse[]>({
+    queryKey: ["procedimentos"],
+    queryFn: async (): Promise<ProcedimentoResponse[]> => {
+      const response = await apiClient.getProcedimentos()
+      return (Array.isArray(response) ? response : response.procedimentos ?? []) as ProcedimentoResponse[]
+    },
   })
 }
 

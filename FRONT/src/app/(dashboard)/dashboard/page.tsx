@@ -14,8 +14,6 @@ import {
   TrendingUp,
   Users,
   AlertCircle,
-  Clock,
-  BarChart3,
   RefreshCw,
   DollarSign,
 } from "lucide-react"

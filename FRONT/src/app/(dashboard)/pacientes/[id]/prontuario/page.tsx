@@ -33,7 +33,7 @@ export default function ProntuarioPage() {
     descricao: "",
   })
 
-  const { data: prontuarios, isLoading } = useProntuariosPaciente(pacienteId)
+  const { data: prontuarios, isLoading } = useProntuariosPaciente(pacienteId) as { data: ProntuarioRegistroSwagger[] | undefined; isLoading: boolean }
   const criarProntuario = useCriarProntuario()
   const atualizarProntuario = useAtualizarProntuario()
 

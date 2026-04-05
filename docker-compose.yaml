@@ -22,8 +22,8 @@ services:
   # 2. Backend (Golang)
   api:
     build: 
-      context: ./api
-      dockerfile: Dockerfile
+      context: ./API
+      dockerfile: dockerfile
     container_name: clinicas_api
     restart: always
     depends_on:
@@ -37,23 +37,24 @@ services:
       JWT_SECRET: sua_chave_secreta_fallback_123
       PORT: 8080
       GIN_MODE: release
-    # Executa migrações (seeds) e depois inicia o binário
-    command: ["sh", "-c", "./main --migrate && ./main"]
+      # Origens permitidas para CORS (separadas por vírgula)
+      CORS_ORIGINS: http://localhost:3000
+    # Inicia o binário (migrations rodam automaticamente)
+    command: ["./main"]
 
   # 3. Frontend (Next.js)
   front:
     build:
       context: ./front
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
     container_name: clinicas_front
     restart: always
     depends_on:
       - api
     ports:
       - "3000:3000"
-    environment:
-      # URL que o seu NAVEGADOR usará para falar com a API
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
 
 volumes:
   pgdata:
