@@ -29,7 +29,8 @@ export default function LoginPage() {
 
     if (result.success) {
       toast.success("Login realizado com sucesso!")
-      router.push("/dashboard")
+      const papel = result.data?.usuario?.papel
+      router.push(papel === "ADM_GERAL" ? "/admin/dashboard" : "/dashboard")
     }
 
     setIsLoading(false)

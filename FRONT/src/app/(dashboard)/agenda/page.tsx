@@ -1,6 +1,7 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { format, parseISO } from "date-fns"
 import { AgendaResponse, PacienteResponse, ProcedimentoResponse, UsuarioResponse } from "@/types/api"
 import { useAgendaDia, useCriarAgenda, useAtualizarStatusAgenda, usePacientes, useProfissionais, useProcedimentos } from "@/hooks/use-agenda"
@@ -37,6 +38,7 @@ const toTimeString = (datetime: string) => {
 
 export default function AgendaPage() {
   const { usuario, hasPermission } = useAuth()
+  const searchParams = useSearchParams()
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [selectedProfessional, setSelectedProfessional] = useState<string>("")
   const [openDialog, setOpenDialog] = useState(false)
@@ -46,6 +48,15 @@ export default function AgendaPage() {
     procedimento_id: "",
     time: "",
   })
+
+  // Abre o modal pré-preenchido quando vindo da página de pacientes
+  useEffect(() => {
+    const pacienteId = searchParams.get("paciente_id")
+    if (pacienteId) {
+      setFormState((prev) => ({ ...prev, paciente_id: pacienteId }))
+      setOpenDialog(true)
+    }
+  }, [searchParams])
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -162,7 +173,9 @@ export default function AgendaPage() {
               <DialogContent>
                 <DialogTitle>Criar Agendamento</DialogTitle>
                 <DialogDescription>
-                  Preencha os dados e selecione a hora para marcar um novo atendimento.
+                  {searchParams.get("paciente_nome")
+                    ? `Agendando para: ${searchParams.get("paciente_nome")}`
+                    : "Preencha os dados e selecione a hora para marcar um novo atendimento."}
                 </DialogDescription>
 
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">

@@ -23,17 +23,23 @@ export const useAuth = () => {
 
   const login = async (email: string, senha: string) => {
     try {
-      const response = await apiClient.login(email, senha);
-      setUsuario(response.usuario, response.access_token);
-      return { success: true, data: response };
+      const response = await apiClient.login(email, senha)
+      // API retorna { token, usuario: { id, nome, email, tipo_usuario_id, clinica_id, papel } }
+      const usuario = {
+        ...response.usuario,
+        clinic_id: String(response.usuario.clinica_id ?? ""),
+        tipo_usuario: response.usuario.papel,
+      }
+      setUsuario(usuario, response.token)
+      return { success: true, data: response }
     } catch (error: unknown) {
       const err = error as { message?: string }
       const errorMessage =
-        err.message || "Erro ao fazer login. Tente novamente.";
-      toast.error(errorMessage);
-      return { success: false, error: errorMessage };
+        err.message || "Erro ao fazer login. Tente novamente."
+      toast.error(errorMessage)
+      return { success: false, error: errorMessage }
     }
-  };
+  }
 
   const handleLogout = () => {
     logout();
