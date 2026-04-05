@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/ferrariwill/Clinicas/database"
-	_ "github.com/ferrariwill/Clinicas/docs"
-	"github.com/ferrariwill/Clinicas/routes"
+	"github.com/ferrariwill/Clinicas/API/database"
+	_ "github.com/ferrariwill/Clinicas/API/docs"
+	"github.com/ferrariwill/Clinicas/API/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
