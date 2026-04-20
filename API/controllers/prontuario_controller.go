@@ -69,13 +69,14 @@ func (pc *ProntuarioController) Criar(c *gin.Context) {
 		Conteudo:   body.Conteudo,
 	}
 	if err := pc.svc.Criar(clinicaID, usuarioID, reg); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"erro": utils.SafeErrorMessage(err, "Não foi possível salvar o prontuário")})
 		return
 	}
 	audit.Log(c.Request.Context(), audit.AcaoProntuarioCriar, "prontuario_registro", reg.ID)
 	_ = pc.auditLog.Registrar(&models.AuditLog{
 		ClinicaID: clinicaID,
 		UsuarioID: usuarioID,
+		PacienteID: &reg.PacienteID,
 		Acao:      audit.AcaoProntuarioCriar,
 		Recurso:   "prontuario_registro",
 		RecursoID: &reg.ID,
@@ -105,9 +106,10 @@ func (pc *ProntuarioController) Listar(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"erro": "Informe paciente_id"})
 		return
 	}
-	list, err := pc.svc.ListarPorPaciente(clinicaID, pid)
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	list, err := pc.svc.ListarPorPaciente(clinicaID, pid, papel)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"erro": utils.SafeErrorMessage(err, "Não foi possível consultar o prontuário")})
 		return
 	}
 	usuarioID, _ := middleware.ExtrairDoToken[uint](c, "usuario_id")
@@ -115,6 +117,7 @@ func (pc *ProntuarioController) Listar(c *gin.Context) {
 	_ = pc.auditLog.Registrar(&models.AuditLog{
 		ClinicaID: clinicaID,
 		UsuarioID: usuarioID,
+		PacienteID: &pid,
 		Acao:      audit.AcaoProntuarioLer,
 		Recurso:   "prontuario_paciente",
 		IP:        c.ClientIP(),
@@ -154,19 +157,20 @@ func (pc *ProntuarioController) Atualizar(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"erro": "Dados inválidos"})
 		return
 	}
-	svcErr := pc.svc.Atualizar(clinicaID, id, body.Titulo, body.Conteudo)
+	pacienteID, svcErr := pc.svc.Atualizar(clinicaID, id, body.Titulo, body.Conteudo)
 	if svcErr != nil {
 		if errors.Is(svcErr, services.ErrProntuarioImutavel) {
 			c.JSON(http.StatusConflict, gin.H{"erro": svcErr.Error()})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"erro": svcErr.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"erro": utils.SafeErrorMessage(svcErr, "Não foi possível atualizar o prontuário")})
 		return
 	}
 	audit.Log(c.Request.Context(), audit.AcaoProntuarioAtualizar, "prontuario_registro", id)
 	_ = pc.auditLog.Registrar(&models.AuditLog{
 		ClinicaID: clinicaID,
 		UsuarioID: usuarioID,
+		PacienteID: pacienteID,
 		Acao:      audit.AcaoProntuarioAtualizar,
 		Recurso:   "prontuario_registro",
 		RecursoID: &id,

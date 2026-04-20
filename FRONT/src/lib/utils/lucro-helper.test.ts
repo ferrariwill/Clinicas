@@ -88,20 +88,20 @@ describe('Lucro Líquido - Integração Financeira', () => {
       expect(resultado).toBe(saldoFinanceiro)
     })
 
-    it('deve usar lucro da agenda quando saldo financeiro is 0', () => {
+    it('deve usar saldo zero do financeiro (não substituir por faturamento da agenda)', () => {
       const lucroAgenda = 7000
       const saldoFinanceiro = 0
       const resultado = obterLucroFinal(lucroAgenda, saldoFinanceiro)
-      
-      expect(resultado).toBe(lucroAgenda)
+
+      expect(resultado).toBe(0)
     })
 
-    it('deve considerar prejuízos corretamente', () => {
+    it('deve manter saldo zero mesmo com prejuízo hipotético só na agenda', () => {
       const lucroAgenda = -3000
       const saldoFinanceiro = 0
       const resultado = obterLucroFinal(lucroAgenda, saldoFinanceiro)
-      
-      expect(resultado).toBe(lucroAgenda)
+
+      expect(resultado).toBe(0)
     })
   })
 

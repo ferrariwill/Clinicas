@@ -17,17 +17,24 @@ export default function AdminUsuariosPage() {
     u.nome.toLowerCase().includes(search.toLowerCase()) ||
     u.email.toLowerCase().includes(search.toLowerCase())
   ) ?? []
+  const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, u) => {
+    const key = String(u.clinica_id)
+    if (!acc[key]) acc[key] = []
+    acc[key].push(u)
+    return acc
+  }, {})
+  const clinicIds = Object.keys(grouped).sort((a, b) => Number(a) - Number(b))
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Usuários</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Usuários</h2>
           <p className="text-sm text-slate-500 mt-1">Todos os usuários cadastrados no sistema</p>
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar usuário..." className="pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-100 w-56" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar usuário..." className="pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-100 w-full sm:w-56" />
         </div>
       </div>
       <Card>
@@ -40,27 +47,40 @@ export default function AdminUsuariosPage() {
               <p className="font-medium">Nenhum usuário encontrado</p>
             </div>
           )}
-          <div className="space-y-3">
-            {filtered.map((u) => {
-              const clinica = clinicas?.find((c) => c.id === u.clinica_id)
+          <div className="space-y-4">
+            {clinicIds.map((cid) => {
+              const users = grouped[cid] ?? []
+              const clinica = clinicas?.find((c) => c.id === Number(cid))
               return (
-                <div key={u.id} className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-violet-700">{u.nome.charAt(0)}</span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-900">{u.nome}</p>
-                      <p className="text-sm text-slate-500">{u.email} · {clinica?.nome ?? `Clínica #${u.clinica_id}`}</p>
-                    </div>
+                <div key={cid} className="rounded-xl border border-slate-200 p-3">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-2">
+                    <p className="font-semibold text-slate-900">{clinica?.nome ?? `Clínica #${cid}`}</p>
+                    <span className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-2 py-1">
+                      {users.length} ativo(s)
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${PAPEL_COLOR[u.tipo_usuario] ?? "bg-slate-100 text-slate-700"}`}>
-                      {PAPEL_LABEL[u.tipo_usuario] ?? u.tipo_usuario}
-                    </span>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${u.ativo ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-                      {u.ativo ? "Ativo" : "Inativo"}
-                    </span>
+                  <div className="space-y-2">
+                    {users.map((u) => (
+                      <div key={u.id} className="rounded-lg border border-slate-100 p-3 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                            <span className="text-sm font-bold text-violet-700">{u.nome.charAt(0)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 truncate">{u.nome}</p>
+                            <p className="text-sm text-slate-500 break-all">{u.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${PAPEL_COLOR[u.tipo_usuario] ?? "bg-slate-100 text-slate-700"}`}>
+                            {PAPEL_LABEL[u.tipo_usuario] ?? u.tipo_usuario}
+                          </span>
+                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                            Ativo
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )

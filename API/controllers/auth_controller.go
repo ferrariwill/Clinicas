@@ -2,11 +2,30 @@ package controllers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/ferrariwill/Clinicas/API/middleware"
+	"github.com/ferrariwill/Clinicas/API/models"
 	"github.com/ferrariwill/Clinicas/API/services"
 	"github.com/gin-gonic/gin"
 )
+
+func usuarioInfoFromModel(usuario *models.Usuario) UsuarioInfo {
+	papel := ""
+	if usuario.TipoUsuario.Papel != "" {
+		papel = usuario.TipoUsuario.Papel
+	}
+	cid := usuario.ClinicaID
+	return UsuarioInfo{
+		ID:                usuario.ID,
+		Nome:              usuario.Nome,
+		Email:             usuario.Email,
+		TipoUsuarioID:     usuario.TipoUsuarioID,
+		ClinicaID:         &cid,
+		Papel:             papel,
+		ObrigarTrocaSenha: usuario.ObrigarTrocaSenha,
+	}
+}
 
 // LoginRequest representa os dados de login
 type LoginRequest struct {
@@ -18,16 +37,19 @@ type LoginRequest struct {
 type LoginResponse struct {
 	Token   string      `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 	Usuario UsuarioInfo `json:"usuario"`
+	// ObrigarTrocaSenha indica que o front deve forçar alteração de senha antes do uso normal.
+	ObrigarTrocaSenha bool `json:"obrigar_troca_senha"`
 }
 
 // UsuarioInfo representa as informações do usuário
 type UsuarioInfo struct {
-	ID            uint   `json:"id" example:"1"`
-	Nome          string `json:"nome" example:"João Silva"`
-	Email         string `json:"email" example:"joao@exemplo.com"`
-	TipoUsuarioID uint   `json:"tipo_usuario_id" example:"1"`
-	ClinicaID     *uint  `json:"clinica_id" example:"1"`
-	Papel         string `json:"papel" example:"MEDICO"`
+	ID                 uint   `json:"id" example:"1"`
+	Nome               string `json:"nome" example:"João Silva"`
+	Email              string `json:"email" example:"joao@exemplo.com"`
+	TipoUsuarioID      uint   `json:"tipo_usuario_id" example:"1"`
+	ClinicaID          *uint  `json:"clinica_id" example:"1"`
+	Papel              string `json:"papel" example:"MEDICO"`
+	ObrigarTrocaSenha  bool   `json:"obrigar_troca_senha"`
 }
 
 // @Summary Login de usuário
@@ -62,22 +84,77 @@ func LoginHandler(authService services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		papel := ""
-		if usuario.TipoUsuario.Papel != "" {
-			papel = usuario.TipoUsuario.Papel
-		}
 		c.JSON(http.StatusOK, LoginResponse{
-			Token: token,
-			Usuario: UsuarioInfo{
-				ID:            usuario.ID,
-				Nome:          usuario.Nome,
-				Email:         usuario.Email,
-				TipoUsuarioID: usuario.TipoUsuarioID,
-				ClinicaID:     &usuario.ClinicaID,
-				Papel:         papel,
-			},
+			Token:             token,
+			ObrigarTrocaSenha: usuario.ObrigarTrocaSenha,
+			Usuario:           usuarioInfoFromModel(usuario),
 		})
 
+	}
+}
+
+// TrocarClinicaBody define o corpo de POST /auth/trocar-clinica.
+type TrocarClinicaBody struct {
+	ClinicaID uint `json:"clinica_id" binding:"required"`
+}
+
+// MinhasClinicasHandler lista clínicas às quais o usuário tem acesso (associações ou, para ADM_GERAL, todas as ativas).
+func MinhasClinicasHandler(authService services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		usuarioID, err := middleware.ExtrairDoToken[uint](c, "usuario_id")
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
+			return
+		}
+		papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+		list, err := authService.MinhasClinicas(usuarioID, papel)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"clinicas": list})
+	}
+}
+
+// TrocarClinicaHandler atualiza o contexto ativo do usuário e devolve um novo JWT.
+func TrocarClinicaHandler(authService services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req TrocarClinicaBody
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		usuarioID, err := middleware.ExtrairDoToken[uint](c, "usuario_id")
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
+			return
+		}
+		papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+		usuario, err := authService.TrocarClinicaAtiva(usuarioID, req.ClinicaID, papel)
+		if err != nil {
+			msg := err.Error()
+			low := strings.ToLower(msg)
+			if strings.Contains(low, "não tem acesso") || strings.Contains(low, "nao tem acesso") {
+				c.JSON(http.StatusForbidden, gin.H{"error": msg})
+				return
+			}
+			if strings.Contains(low, "não encontrada") || strings.Contains(low, "nao encontrada") {
+				c.JSON(http.StatusNotFound, gin.H{"error": msg})
+				return
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+			return
+		}
+		token, err := middleware.GerarToken(usuario)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao gerar o token"})
+			return
+		}
+		c.JSON(http.StatusOK, LoginResponse{
+			Token:             token,
+			ObrigarTrocaSenha: usuario.ObrigarTrocaSenha,
+			Usuario:           usuarioInfoFromModel(usuario),
+		})
 	}
 }
 
@@ -110,7 +187,8 @@ func AlterarSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 		usuarioId, _ := middleware.ExtrairDoToken[uint](c, "usuario_id")
 		err := authService.AlterarSenha(usuarioId, req.Senha, req.NovaSenha)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			// 400 evita que o cliente trate como sessão expirada (interceptors costumam limpar token em 401).
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -152,11 +230,16 @@ func EsqueciSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 
 		err := authService.GerarTokenRedifinicao(req.Email)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			low := strings.ToLower(err.Error())
+			if strings.Contains(low, "não encontrado") || strings.Contains(low, "nao encontrado") {
+				c.JSON(http.StatusOK, gin.H{"message": "SE O E-MAIL ESTIVER CADASTRADO, VOCÊ RECEBERÁ UMA SENHA PROVISÓRIA."})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": strings.ToUpper(err.Error())})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "Email enviado com sucesso"})
+		c.JSON(http.StatusOK, gin.H{"message": "SE O E-MAIL ESTIVER CADASTRADO, VOCÊ RECEBERÁ UMA SENHA PROVISÓRIA."})
 
 	}
 }
@@ -189,5 +272,25 @@ func RedefinirSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, gin.H{"message": "Senha redefinida com sucesso"})
 
+	}
+}
+
+// MinhasPermissoesRotasHandler retorna as rotas de API (FullPath) permitidas ao tipo do usuário logado, ou acesso_total para dono/admin global.
+func MinhasPermissoesRotasHandler(permissaoTelaService services.PermissaoTelaService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tipoUsuarioID, err := middleware.ExtrairDoToken[uint](c, "tipo_usuario_id")
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
+			return
+		}
+		rotas, acessoTotal, err := permissaoTelaService.ListarRotasPermitidas(tipoUsuarioID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar permissões"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"rotas":        rotas,
+			"acesso_total": acessoTotal,
+		})
 	}
 }

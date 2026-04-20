@@ -10,6 +10,7 @@ type TipoUsuarioRepository interface {
 	BuscarPorNomeENomeClinica(nome string, clinicaID uint) (*models.TipoUsuario, error)
 	ListarPorClinica(clinicaID uint) ([]models.TipoUsuario, error)
 	BuscarPorID(id uint) (*models.TipoUsuario, error)
+	BuscarPorIDClinica(id, clinicaID uint) (*models.TipoUsuario, error)
 	Atualizar(tu *models.TipoUsuario) error
 	Desativar(id uint) error
 	Reativar(id uint) error
@@ -42,6 +43,12 @@ func (r *tipoUsuarioRepository) ListarPorClinica(clinicaID uint) ([]models.TipoU
 func (r *tipoUsuarioRepository) BuscarPorID(id uint) (*models.TipoUsuario, error) {
 	var tu models.TipoUsuario
 	err := r.db.First(&tu, id).Error
+	return &tu, err
+}
+
+func (r *tipoUsuarioRepository) BuscarPorIDClinica(id, clinicaID uint) (*models.TipoUsuario, error) {
+	var tu models.TipoUsuario
+	err := r.db.Where("id = ? AND clinica_id = ?", id, clinicaID).First(&tu).Error
 	return &tu, err
 }
 

@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
+import { useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
 import { useDashboardMetrics, useResumoFinanceiroMes } from "@/hooks/use-dashboard"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +11,6 @@ import { ClinicaSelector } from "@/components/clinica-selector"
 import MetricCard from "@/components/metric-card"
 import { MetricCardSkeleton } from "@/components/ui/skeleton"
 import { formatCurrency, formatPercentage, formatTime, formatNumber } from "@/lib/utils/formatters"
-import { obterLucroFinal } from "@/lib/utils/lucro-helper"
 import {
   TrendingUp,
   Users,
@@ -25,12 +26,26 @@ import {
  * 1. Agenda: Agendamentos realizados geram receitas
  * 2. Financeiro: Despesas manuais são abatidas do lucro
  * 
- * O lucro líquido é calculado como:
- * Lucro = Faturamento (agendamentos) - Despesas (módulo financeiro)
+ * Resultado no caixa do mês vem do resumo financeiro (entradas − saídas, incluindo custos fixos quando a API enviar).
+ * O faturamento da agenda é só a soma de agendamentos realizados (métrica operacional).
  */
 export default function DashboardOperacionalPage() {
-  const { usuario, clinicaId } = useAuth()
+  const router = useRouter()
+  const { usuario, clinicaId, userRole } = useAuth()
+  const isMedico = userRole === "MEDICO"
+  const { data: permRotas, isFetched } = useMinhasPermissoesRotas()
   const [selectedClinicaId, setSelectedClinicaId] = useState<string | undefined>(clinicaId ?? undefined)
+
+  useEffect(() => {
+    if (!isFetched) return
+    const acessoTotal = Boolean(permRotas?.acesso_total) || userRole === "DONO"
+    const rotas = permRotas?.rotas ?? []
+    const podeDashboard =
+      acessoTotal || rotas.some((r) => r === "/dashboard" || r.startsWith("/dashboard/"))
+    if (!podeDashboard) {
+      router.replace("/agenda")
+    }
+  }, [isFetched, permRotas, userRole, router])
 
   useEffect(() => {
     if (!selectedClinicaId && clinicaId) {
@@ -41,29 +56,38 @@ export default function DashboardOperacionalPage() {
   const { data, isLoading, isError, error, refetch } = useDashboardMetrics(
     selectedClinicaId
   )
-  const { data: resumoFinanceiro, isLoading: loadingFinanceiro } = useResumoFinanceiroMes(selectedClinicaId)
+  const { data: resumoFinanceiro, isLoading: loadingFinanceiro } = useResumoFinanceiroMes(
+    isMedico ? undefined : selectedClinicaId
+  )
 
   const handleClinicaChange = (novaClinicaId: string) => {
     setSelectedClinicaId(novaClinicaId)
   }
 
-  // Cálculo de Lucro Líquido
-  // Faturamento mensal vem dos agendamentos marcados como REALIZADO
-  // Despesas (totalSaidas) vêm do módulo de Gestão Financeira
-  const faturamento = data?.faturamento_mensal ?? 0
-  const despesas = resumoFinanceiro?.totalSaidas ?? 0
-  const lucroLiquido = faturamento - despesas
-  
-  // Saldo financeiro considera entradas - saídas (inclui receitas manuais)
-  const saldoFinanceiro = resumoFinanceiro?.saldoLiquido ?? 0
+  const faturamento =
+    (data?.faturamento ?? data?.faturamento_mensal ?? 0) as number
+  const despesas = isMedico ? 0 : (resumoFinanceiro?.totalSaidas ?? 0)
+  const entradasFinanceiro = isMedico ? 0 : (resumoFinanceiro?.totalEntradas ?? 0)
+  /** Saldo do módulo financeiro no período (não misturar com `||` sobre zero). */
+  const saldoFinanceiro = isMedico ? 0 : (resumoFinanceiro?.saldoLiquido ?? 0)
+  /** Resultado do mês alinhado ao caixa; se o resumo falhar, aproxima por faturamento da agenda − saídas. */
+  const lucroTotal = isMedico
+    ? 0
+    : resumoFinanceiro != null
+      ? saldoFinanceiro
+      : faturamento - despesas
 
-  // Lucro total usa a integração completa
-  const lucroTotal = obterLucroFinal(lucroLiquido, saldoFinanceiro)
+  const noShowPct =
+    (data?.taxa_no_show_percentual ?? data?.no_show_taxa ?? 0) as number
+  const totalAtendimentos =
+    (data?.agendamentos_considerados ??
+      data?.total_atendimentos ??
+      0) as number
 
   const metrics = {
     faturamento_mensal: faturamento,
-    no_show_taxa: data?.no_show_taxa ?? 0,
-    total_atendimentos: data?.total_atendimentos ?? 0,
+    no_show_taxa: noShowPct,
+    total_atendimentos: totalAtendimentos,
     tempo_medio_consulta: data?.tempo_medio_consulta ?? 0,
     lotacao_media: data?.lotacao_media ?? 0,
     taxa_conversao: data?.taxa_conversao ?? 0,
@@ -114,7 +138,7 @@ export default function DashboardOperacionalPage() {
       {/* Principal */}
       <div className="grid gap-4 xl:grid-cols-[2.5fr_1fr]">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-          {isLoading || loadingFinanceiro ? (
+          {isLoading || (!isMedico && loadingFinanceiro) ? (
             <>
               <MetricCardSkeleton />
               <MetricCardSkeleton />
@@ -123,25 +147,29 @@ export default function DashboardOperacionalPage() {
             </>
           ) : (
             <>
-              <MetricCard
-                title="Faturamento Mensal"
-                description="Arrecadação do mês"
-                value={formatCurrency(metrics.faturamento_mensal)}
-                icon={TrendingUp}
-                trend="up"
-                trendValue="Receitas de agendamentos realizados"
-                variant="success"
-              />
+              {!isMedico && (
+                <MetricCard
+                  title="Faturamento Mensal"
+                  description="Arrecadação do mês"
+                  value={formatCurrency(metrics.faturamento_mensal)}
+                  icon={TrendingUp}
+                  trend="up"
+                  trendValue="Receitas de agendamentos realizados"
+                  variant="success"
+                />
+              )}
 
-              <MetricCard
-                title="Lucro Líquido"
-                description="Faturamento - Despesas do mês"
-                value={formatCurrency(lucroTotal)}
-                icon={DollarSign}
-                trend={lucroTotal > 0 ? "up" : "down"}
-                trendValue={lucroTotal > 0 ? "Resultado positivo" : "Resultado negativo"}
-                variant={lucroTotal > 0 ? "success" : "warning"}
-              />
+              {!isMedico && (
+                <MetricCard
+                  title="Lucro Líquido"
+                  description="Saldo do mês (módulo financeiro)"
+                  value={formatCurrency(lucroTotal)}
+                  icon={DollarSign}
+                  trend={lucroTotal > 0 ? "up" : "down"}
+                  trendValue={lucroTotal > 0 ? "Resultado positivo" : "Resultado negativo"}
+                  variant={lucroTotal > 0 ? "success" : "warning"}
+                />
+              )}
 
               <MetricCard
                 title="Taxa de No-Show"
@@ -211,35 +239,48 @@ export default function DashboardOperacionalPage() {
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-        {/* Financial Breakdown */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h3 className="font-semibold text-green-900 flex items-center gap-2">
-            💰 Integração Financeira
-          </h3>
-          <div className="text-green-700 text-xs mt-3 space-y-2">
-            <div className="flex justify-between items-center">
-              <span>Faturamento:</span>
-              <span className="font-semibold">{formatCurrency(faturamento)}</span>
-            </div>
-            <div className="border-t border-green-300 pt-2">
-              <div className="flex justify-between items-center text-red-700">
-                <span>(-) Despesas:</span>
-                <span className="font-semibold">{formatCurrency(despesas)}</span>
+        {!isMedico && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h3 className="font-semibold text-green-900 flex items-center gap-2">
+              💰 Integração Financeira
+            </h3>
+            <div className="text-green-700 text-xs mt-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span>Faturamento (agenda realizada):</span>
+                <span className="font-semibold">{formatCurrency(faturamento)}</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-green-200 pt-2">
+                <span>Entradas (caixa no período):</span>
+                <span className="font-semibold">{formatCurrency(entradasFinanceiro)}</span>
+              </div>
+              <div className="border-t border-green-300 pt-2">
+                <div className="flex justify-between items-center text-red-700">
+                  <span>(-) Saídas (período):</span>
+                  <span className="font-semibold">{formatCurrency(despesas)}</span>
+                </div>
+              </div>
+              <div className="border-t border-green-300 pt-2 flex justify-between items-center font-bold">
+                <span>Lucro líquido (saldo):</span>
+                <span className={lucroTotal >= 0 ? "text-green-700" : "text-red-700"}>
+                  {formatCurrency(lucroTotal)}
+                </span>
               </div>
             </div>
-            <div className="border-t border-green-300 pt-2 flex justify-between items-center font-bold">
-              <span>Lucro Líquido:</span>
-              <span className={lucroTotal >= 0 ? "text-green-700" : "text-red-700"}>
-                {formatCurrency(lucroTotal)}
-              </span>
-            </div>
+            <p className="text-green-600 text-xs mt-3 border-t border-green-300 pt-2">
+              O saldo usa o mesmo cálculo do módulo financeiro (entradas − saídas). O faturamento da agenda é referência operacional dos atendimentos realizados.
+            </p>
           </div>
-          <p className="text-green-600 text-xs mt-3 border-t border-green-300 pt-2">
-            ✓ Inclui receitas de agendamentos REALIZADO<br/>
-            ✓ Abate despesas manuais contabilizadas<br/>
-            ✓ Atualizado mensalmente
-          </p>
-        </div>
+        )}
+
+        {isMedico && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 md:col-span-1">
+            <h3 className="font-semibold text-slate-900">Visão do profissional</h3>
+            <p className="text-slate-600 text-sm mt-2">
+              Valores financeiros e integração de caixa ficam restritos ao dono da clínica. Aqui você acompanha volume de
+              atendimentos e indicadores operacionais.
+            </p>
+          </div>
+        )}
 
         {/* Performance Note */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

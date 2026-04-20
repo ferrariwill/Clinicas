@@ -54,7 +54,7 @@ export default function AdminDashboardPage() {
                 <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
                   <div>
                     <p className="text-sm font-medium text-slate-900">{c.nome}</p>
-                    <p className="text-xs text-slate-400">{c.cnpj}</p>
+                    <p className="text-xs text-slate-400">{c.documento}</p>
                   </div>
                   <span className={`text-xs font-medium px-2 py-1 rounded-full ${c.ativa ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
                     {c.ativa ? "Ativa" : "Inativa"}

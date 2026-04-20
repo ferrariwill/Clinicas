@@ -6,10 +6,18 @@ import (
 )
 
 func CriarClinicaDTO_CriarClinica(dto DTO.CriarClinicaDTO) models.Clinica {
+	cnpj := ""
+	if len(dto.Documento) == 14 {
+		cnpj = dto.Documento
+	}
 	return models.Clinica{
 		Nome:             dto.Nome,
-		CNPJ:             dto.CNPJ,
+		Documento:        dto.Documento,
+		CNPJ:             cnpj,
 		Ativa:            dto.Ativa,
 		EmailResponsavel: dto.EmailResponsavel,
+		NomeResponsavel:  dto.NomeResponsavel,
+		Telefone:         dto.Telefone,
+		Endereco:         dto.Endereco,
 		Capacidade:       100}
 }

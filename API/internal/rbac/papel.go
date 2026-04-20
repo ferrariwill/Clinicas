@@ -21,11 +21,16 @@ func PodeGerenciarProntuario(papel string) bool {
 // PodeLerProntuario inclui secretária para triagem administrativa.
 func PodeLerProntuario(papel string) bool {
 	switch papel {
-	case PapelADMGeral, PapelDono, PapelMedico, PapelSecretaria:
+	case PapelADMGeral, PapelDono, PapelMedico, PapelSecretaria, "RECEPCAO":
 		return true
 	default:
 		return false
 	}
+}
+
+// PodeDescriptografarProntuario restringe conteúdo sensível legível.
+func PodeDescriptografarProntuario(papel string) bool {
+	return papel == PapelMedico || papel == PapelDono
 }
 
 // PodeAcessarFinanceiro — dono e administrador da clínica; médico conforme política (aqui: não por padrão).

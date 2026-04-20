@@ -33,13 +33,18 @@ export const useResumoFinanceiroMes = (clinicaId?: string) => {
 
   return useQuery({
     queryKey: ["resumo-financeiro-mes", clinicaId, dataInicio, dataFim],
+    enabled: Boolean(clinicaId),
     queryFn: async () => {
       try {
         const data = await apiClient.getResumoFinanceiro(dataInicio, dataFim)
         return data as ResumoFinanceiro
       } catch (error: unknown) {
         // Não fazer toast error aqui para não poluir a UI se houver erro
-        console.error("Erro ao carregar resumo financeiro:", error)
+        const msg =
+          error && typeof error === "object" && "message" in error
+            ? String((error as { message?: string }).message)
+            : String(error)
+        console.warn("Resumo financeiro indisponível:", msg || "(sem detalhe)")
         // Retornar valores padrão em caso de erro
         return {
           totalEntradas: 0,

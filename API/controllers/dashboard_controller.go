@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	"github.com/ferrariwill/Clinicas/API/services"
 	"github.com/gin-gonic/gin"
@@ -144,6 +145,10 @@ func (dc *DashboardController) MetricasOperacionais(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
 		return
+	}
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if papel == rbac.PapelMedico {
+		m.Faturamento = 0
 	}
 	c.JSON(http.StatusOK, m)
 }

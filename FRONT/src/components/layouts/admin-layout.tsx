@@ -52,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-slate-900 transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 flex w-[85vw] max-w-64 flex-col bg-slate-900 transition-transform duration-300 lg:static lg:w-64 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -114,7 +114,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
-        <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-slate-200 bg-white px-6">
+        <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-slate-200 bg-white px-3 sm:px-4 lg:px-6">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden text-slate-500 hover:text-slate-900"
@@ -122,15 +122,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold text-slate-900">{currentPage}</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="truncate text-base sm:text-lg font-semibold text-slate-900">{currentPage}</h1>
           </div>
 
           <div className="flex items-center gap-3">
             <span className="hidden sm:block text-sm text-slate-600">{usuario?.nome}</span>
             <button
               onClick={() => { logout(); router.push("/login") }}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+              className="flex items-center gap-2 rounded-lg px-2 sm:px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
             >
               <LogOut className="h-4 w-4" />
               <span className="hidden sm:block">Sair</span>
@@ -139,7 +139,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6">
           {children}
         </main>
       </div>

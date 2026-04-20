@@ -9,6 +9,7 @@ type TipoUsuarioService interface {
 	Criar(tu *models.TipoUsuario) error
 	ListarPorClinica(clinicaID uint) ([]models.TipoUsuario, error)
 	BuscarPorID(id uint) (*models.TipoUsuario, error)
+	BuscarPorIDEClinica(id, clinicaID uint) (*models.TipoUsuario, error)
 	Atualizar(tu *models.TipoUsuario) error
 	Desativar(id uint) error
 	Reativar(id uint) error
@@ -32,6 +33,10 @@ func (s *tipoUsuarioService) ListarPorClinica(clinicaID uint) ([]models.TipoUsua
 
 func (s *tipoUsuarioService) BuscarPorID(id uint) (*models.TipoUsuario, error) {
 	return s.repo.BuscarPorID(id)
+}
+
+func (s *tipoUsuarioService) BuscarPorIDEClinica(id, clinicaID uint) (*models.TipoUsuario, error) {
+	return s.repo.BuscarPorIDClinica(id, clinicaID)
 }
 
 func (s *tipoUsuarioService) Atualizar(tu *models.TipoUsuario) error {

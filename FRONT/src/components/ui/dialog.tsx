@@ -36,16 +36,23 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-[min(95vw,520px)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl",
-        className
+        // Camada full-screen só centraliza; className do consumidor (max-w-*) vai no painel branco.
+        "fixed inset-0 z-50 flex items-center justify-center border-0 bg-transparent p-4 shadow-none outline-none pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
       )}
       {...props}
     >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Fechar</span>
-      </DialogPrimitive.Close>
+      <div
+        className={cn(
+          "pointer-events-auto relative grid w-full max-w-[min(95vw,520px)] gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl",
+          className
+        )}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Fechar</span>
+        </DialogPrimitive.Close>
+      </div>
     </DialogPrimitive.Content>
   </DialogPortal>
 ))

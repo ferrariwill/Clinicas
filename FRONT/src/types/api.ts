@@ -17,6 +17,8 @@ export interface UsuarioInfo {
   tipo_usuario: string; // ADM_GERAL, DONO, MEDICO, SECRETARIA
   clinic_id: string;
   ativo: boolean;
+  /** Primeiro acesso ou recuperação de senha: o sistema exige trocar a senha. */
+  obrigar_troca_senha?: boolean;
 }
 
 export interface AlterarSenhaRequest {
@@ -42,6 +44,15 @@ export interface ClinicaRequest {
   cidade?: string;
   estado?: string;
   cep?: string;
+}
+
+/** Item de GET /auth/minhas-clinicas (contexto do usuário na clínica). */
+export interface MinhaClinicaAuth {
+  clinica_id: number;
+  nome: string;
+  email: string;
+  tipo_usuario_id: number;
+  papel: string;
 }
 
 export interface ClinicaResponse {
@@ -90,7 +101,10 @@ export interface PacienteResponse {
 // Schedule Types
 export interface AgendaRequest {
   paciente_id: string;
-  procedimento_id: string;
+  /** Primeiro procedimento (legado); se `procedimento_ids` tiver vários, o primeiro é o principal. */
+  procedimento_id?: string;
+  /** Ordem dos procedimentos selecionados (múltiplos no mesmo horário). */
+  procedimento_ids?: string[];
   data_horario: string;
   usuario_id: string;
 }
@@ -98,9 +112,17 @@ export interface AgendaRequest {
 export interface AgendaResponse {
   id: string;
   paciente_id: string;
+  paciente_nome?: string;
   procedimento_id: string;
+  procedimento_nome?: string;
+  /** Todos os procedimentos do agendamento (principal + extras). */
+  procedimento_ids?: string[];
+  procedimento_nomes?: string[];
+  valor_total?: number;
+  duracao_total_minutos?: number;
   data_horario: string;
   usuario_id: string;
+  usuario_nome?: string;
   status: string;
   conflito?: boolean;
   criado_em: string;
@@ -133,14 +155,16 @@ export interface AgendamentoHojeResponse {
 export interface CriarProntuarioRequest {
   paciente_id: string;
   titulo: string;
+  /** Texto da evolução; a API persiste em `conteudo`. */
   descricao?: string;
+  conteudo?: string;
   data_consulta?: string;
-  usuario_id: string;
 }
 
 export interface AtualizarProntuarioRequest {
   titulo: string;
   descricao?: string;
+  conteudo?: string;
 }
 
 export interface ProntuarioRegistroSwagger {
@@ -169,6 +193,7 @@ export interface ProcedimentoResponse {
   descricao?: string;
   duracao_minutos: number;
   valor: number;
+  ativo?: boolean;
   clinic_id: string;
   criado_em: string;
 }
@@ -192,24 +217,40 @@ export interface UsuarioResponse {
   nome: string;
   email: string;
   tipo_usuario: string;
+  /** Papel RBAC (MEDICO, DONO, …) — usar para filtros; `tipo_usuario` pode ser o nome amigável. */
+  papel?: string;
+  /** Máximo de atendimentos simultâneos no mesmo intervalo (com `permite_simultaneo`). */
+  max_pacientes?: number;
+  /** Se true, a agenda pode empilhar até `max_pacientes` agendamentos sobrepostos. */
+  permite_simultaneo?: boolean;
+  /** ID do tipo (Médico, Secretária, …) na clínica, quando a API envia aninhado. */
+  tipo_usuario_id?: number;
   telefone?: string;
   clinic_id: string;
   ativo: boolean;
   criado_em: string;
 }
 
-export interface UsuarioHorarioRequest {
-  dias_semana: number[]; // 0-6
+/** Um dia da grade (API PUT /usuarios/:id/horarios). */
+export interface UsuarioHorarioItem {
+  dia_semana: number; // 0=domingo … 6=sábado
   horario_inicio: string; // HH:mm
-  horario_fim: string; // HH:mm
+  horario_fim: string;
+  ativo: boolean;
 }
 
-export interface UsuarioHorarioResponse {
-  id: string;
-  usuario_id: string;
-  dias_semana: number[];
+export interface DefinirHorariosUsuarioRequest {
+  horarios: UsuarioHorarioItem[];
+}
+
+export interface UsuarioHorarioItemResponse {
+  id?: string;
+  usuario_id?: string;
+  dia_semana: number;
+  dia_semana_texto?: string;
   horario_inicio: string;
   horario_fim: string;
+  ativo: boolean;
 }
 
 // Dashboard Types
@@ -234,18 +275,27 @@ export interface EstatisticasResponse {
 }
 
 export interface MetricasOperacionaisSwagger {
-  faturamento_mensal: number;
-  no_show_taxa: number;
-  total_atendimentos: number;
-  tempo_medio_consulta: number;
-  lotacao_media: number;
-  taxa_conversao: number;
-  satisfacao_media: number;
+  /** API: `faturamento` (período consultado) */
+  faturamento?: number;
+  faturamento_mensal?: number;
+  periodo_inicio?: string;
+  periodo_fim?: string;
+  agendamentos_considerados?: number;
+  total_faltas?: number;
+  /** API: `taxa_no_show_percentual` */
+  taxa_no_show_percentual?: number;
+  no_show_taxa?: number;
+  total_atendimentos?: number;
+  tempo_medio_consulta?: number;
+  lotacao_media?: number;
+  taxa_conversao?: number;
+  satisfacao_media?: number;
 }
 
-// Insurance Types
+// Insurance / convênios (API: nome + ativo; campos extras opcionais)
 export interface ConvenioRequest {
   nome: string;
+  ativo: boolean;
   cnpj?: string;
   desconto_percentual?: number;
 }
@@ -253,11 +303,11 @@ export interface ConvenioRequest {
 export interface ConvenioResponse {
   id: string;
   nome: string;
+  ativo: boolean;
+  clinica_id?: string;
+  criado_em?: string;
   cnpj?: string;
   desconto_percentual?: number;
-  clinic_id: string;
-  ativo: boolean;
-  criado_em: string;
 }
 
 // Permission Types
@@ -268,11 +318,12 @@ export interface RolePermission {
   telas_permitidas: string[];
 }
 
-// API Error Response
+// API Error Response (campos opcionais: o backend usa `erro` ou `error` em gin.H)
 export interface ErrorResponse {
-  status: number;
-  mensagem: string;
+  status?: number;
+  mensagem?: string;
   erro?: string;
+  error?: string;
   detalhes?: string | Record<string, string>;
 }
 
@@ -305,8 +356,29 @@ export interface LancamentoFinanceiro {
 
 export interface ResumoFinanceiro {
   totalEntradas: number;
+  /** Saídas só de lançamentos no período */
+  totalSaidasLancamentos?: number;
+  /** Soma mensal de custos fixos ativos */
+  custosFixosMensal?: number;
+  /** Meses-calendário usados para projetar custos fixos */
+  mesesNoPeriodo?: number;
+  /** custosFixosMensal × mesesNoPeriodo */
+  custosFixosNoPeriodo?: number;
+  /** Lançamentos + custos fixos no período */
   totalSaidas: number;
   saldoLiquido: number;
+  /** Saldo só com lançamentos (sem custos fixos) */
+  saldoLiquidoLancamentos?: number;
+}
+
+export interface CustoFixo {
+  id: string;
+  descricao: string;
+  valor_mensal: number;
+  ativo: boolean;
+  clinica_id?: string;
+  criado_em?: string;
+  atualizado_em?: string;
 }
 
 export interface CriarLancamentoRequest {

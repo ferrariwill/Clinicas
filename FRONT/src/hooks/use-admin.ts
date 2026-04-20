@@ -7,18 +7,56 @@ import { toast } from "sonner"
 export interface ClinicaAdmin {
   id: number
   nome: string
-  cnpj: string
+  documento: string
   email_responsavel: string
+  nome_responsavel: string
+  telefone: string
+  endereco: string
   ativa: boolean
   capacidade: number
   created_at: string
 }
 
+/** API Go (sem tags json) envia PascalCase; normaliza para o front. */
+function mapClinicaAdmin(raw: Record<string, unknown>): ClinicaAdmin {
+  const id = raw.id ?? raw.ID
+  const nome = raw.nome ?? raw.Nome
+  const documento = raw.documento ?? raw.Documento ?? raw.cnpj ?? raw.CNPJ
+  const email = raw.email_responsavel ?? raw.EmailResponsavel
+  const nomeResponsavel = raw.nome_responsavel ?? raw.NomeResponsavel
+  const telefone = raw.telefone ?? raw.Telefone
+  const endereco = raw.endereco ?? raw.Endereco
+  const ativa = raw.ativa ?? raw.Ativa
+  const capacidade = raw.capacidade ?? raw.Capacidade
+  const created = raw.created_at ?? raw.CreatedAt
+  return {
+    id: Number(id),
+    nome: typeof nome === "string" ? nome : "",
+    documento: typeof documento === "string" ? documento : "",
+    email_responsavel: typeof email === "string" ? email : "",
+    nome_responsavel: typeof nomeResponsavel === "string" ? nomeResponsavel : "",
+    telefone: typeof telefone === "string" ? telefone : "",
+    endereco: typeof endereco === "string" ? endereco : "",
+    ativa: Boolean(ativa),
+    capacidade: typeof capacidade === "number" ? capacidade : Number(capacidade) || 0,
+    created_at: typeof created === "string" ? created : "",
+  }
+}
+
 export interface CriarClinicaPayload {
   nome: string
-  cnpj: string
+  documento: string
   email_responsavel: string
+  nome_responsavel: string
+  telefone?: string
+  endereco?: string
   ativa: boolean
+  plano_id: number
+  /** YYYY-MM-DD início da assinatura */
+  data_inicio: string
+  periodo_assinatura?: "ANUAL" | "SEMESTRAL" | "DEFINIDO"
+  periodo_meses?: number | null
+  data_fim?: string | null
 }
 
 export const useAdminClinicas = () =>
@@ -26,7 +64,8 @@ export const useAdminClinicas = () =>
     queryKey: ["admin-clinicas"],
     queryFn: async () => {
       const res = await apiClient.getAxiosInstance().get("/admin/clinicas")
-      return res.data.clinicas ?? res.data ?? []
+      const list = (res.data.clinicas ?? res.data ?? []) as Record<string, unknown>[]
+      return Array.isArray(list) ? list.map(mapClinicaAdmin) : []
     },
   })
 
@@ -38,6 +77,7 @@ export const useCriarClinica = () => {
     onSuccess: () => {
       toast.success("Clínica criada com sucesso!")
       qc.invalidateQueries({ queryKey: ["admin-clinicas"] })
+      qc.invalidateQueries({ queryKey: ["admin-assinaturas"] })
     },
     onError: (e: unknown) => {
       const err = e as { message?: string }
@@ -49,10 +89,12 @@ export const useCriarClinica = () => {
 export const useToggleClinica = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ativa }: { id: number; ativa: boolean }) =>
-      apiClient.getAxiosInstance()
-        .put(`/clinicas/${id}/${ativa ? "reativar" : ""}`, {})
-        .then((r) => r.data),
+    mutationFn: ({ id, ativa }: { id: number; ativa: boolean }) => {
+      const ax = apiClient.getAxiosInstance()
+      return ativa
+        ? ax.put(`/clinicas/${id}/reativar`, {}).then((r) => r.data)
+        : ax.delete(`/clinicas/${id}`).then((r) => r.data)
+    },
     onSuccess: () => {
       toast.success("Status da clínica atualizado!")
       qc.invalidateQueries({ queryKey: ["admin-clinicas"] })
@@ -72,12 +114,42 @@ export interface UsuarioAdmin {
   created_at: string
 }
 
+function mapUsuarioAdmin(raw: Record<string, unknown>): UsuarioAdmin {
+  const id = raw.id ?? raw.ID
+  const nome = raw.nome ?? raw.Nome
+  const email = raw.email ?? raw.Email
+  const ativo = raw.ativo ?? raw.Ativo
+  const clinicaId = raw.clinica_id ?? raw.ClinicaID
+  const created = raw.created_at ?? raw.CreatedAt
+
+  let tipoUsuario: string = ""
+  const nested = raw.TipoUsuario as Record<string, unknown> | undefined
+  if (nested && typeof nested === "object") {
+    if (typeof nested.Papel === "string" && nested.Papel) tipoUsuario = nested.Papel
+    else if (typeof nested.Nome === "string") tipoUsuario = nested.Nome
+  }
+  if (!tipoUsuario && typeof raw.tipo_usuario === "string") tipoUsuario = raw.tipo_usuario
+
+  return {
+    id: Number(id),
+    nome: typeof nome === "string" ? nome : "",
+    email: typeof email === "string" ? email : "",
+    tipo_usuario: tipoUsuario,
+    ativo: Boolean(ativo),
+    clinica_id: Number(clinicaId),
+    created_at: typeof created === "string" ? created : "",
+  }
+}
+
 export const useAdminUsuarios = () =>
   useQuery<UsuarioAdmin[]>({
     queryKey: ["admin-usuarios"],
     queryFn: async () => {
-      const res = await apiClient.getAxiosInstance().get("/admin/usuarios")
-      return res.data.usuarios ?? res.data ?? []
+      const res = await apiClient.getAxiosInstance().get("/admin/usuarios", {
+        params: { ativos: true },
+      })
+      const list = (res.data.usuarios ?? res.data ?? []) as Record<string, unknown>[]
+      return Array.isArray(list) ? list.map(mapUsuarioAdmin) : []
     },
   })
 
@@ -90,6 +162,24 @@ export interface Plano {
   valor: number
   limite_usuarios: number
   ativo: boolean
+}
+
+function mapPlano(raw: Record<string, unknown>): Plano {
+  const id = raw.id ?? raw.ID
+  const nome = raw.nome ?? raw.Nome
+  const descricao = raw.descricao ?? raw.Descricao
+  const valorRaw = raw.valor ?? raw.Valor ?? raw.valor_mensal ?? raw.ValorMensal
+  const limite = raw.limite_usuarios ?? raw.LimiteUsuarios
+  const ativo = raw.ativo ?? raw.Ativo
+  const valor = typeof valorRaw === "number" ? valorRaw : Number(valorRaw) || 0
+  return {
+    id: Number(id),
+    nome: typeof nome === "string" ? nome : "",
+    descricao: typeof descricao === "string" ? descricao : "",
+    valor,
+    limite_usuarios: typeof limite === "number" ? limite : Number(limite) || 0,
+    ativo: Boolean(ativo),
+  }
 }
 
 export interface CriarPlanoPayload {
@@ -105,7 +195,9 @@ export const usePlanos = () =>
     queryKey: ["admin-planos"],
     queryFn: async () => {
       const res = await apiClient.getAxiosInstance().get("/admin/planos/Listar")
-      return res.data ?? []
+      const data = res.data
+      const list = (Array.isArray(data) ? data : []) as Record<string, unknown>[]
+      return list.map(mapPlano)
     },
   })
 
@@ -136,10 +228,31 @@ export interface Assinatura {
   data_expiracao: string | null
 }
 
+function mapAssinatura(raw: Record<string, unknown>): Assinatura {
+  const id = raw.id ?? raw.ID
+  const clinicaId = raw.clinica_id ?? raw.ClinicaID
+  const planoId = raw.plano_id ?? raw.PlanoID
+  const ativa = raw.ativa ?? raw.Ativa
+  const di = raw.data_inicio ?? raw.DataInicio
+  const de = raw.data_expiracao ?? raw.DataExpiracao
+  let dataExpiracao: string | null = null
+  if (de != null && typeof de === "string") dataExpiracao = de
+  return {
+    id: Number(id),
+    clinica_id: Number(clinicaId),
+    plano_id: Number(planoId),
+    ativa: Boolean(ativa),
+    data_inicio: typeof di === "string" ? di : "",
+    data_expiracao: dataExpiracao,
+  }
+}
+
 export interface CriarAssinaturaPayload {
   clinica_id: number
   plano_id: number
   data_inicio: string
+  periodo_assinatura?: "ANUAL" | "SEMESTRAL" | "DEFINIDO"
+  periodo_meses?: number | null
   data_fim: string | null
 }
 
@@ -148,7 +261,9 @@ export const useAssinaturas = () =>
     queryKey: ["admin-assinaturas"],
     queryFn: async () => {
       const res = await apiClient.getAxiosInstance().get("/admin/assinaturas")
-      return res.data ?? []
+      const data = res.data
+      const list = (Array.isArray(data) ? data : []) as Record<string, unknown>[]
+      return list.map(mapAssinatura)
     },
   })
 

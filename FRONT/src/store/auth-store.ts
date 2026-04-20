@@ -16,6 +16,7 @@ interface AuthState {
   userRole: TipoUsuario | null;
 
   setUsuario: (usuario: UsuarioInfo, token: string) => void;
+  patchUsuario: (partial: Partial<UsuarioInfo>) => void;
   clearAuth: () => void;
   setClinicaId: (clinicaId: string) => void;
   loadFromCookies: () => void;
@@ -30,16 +31,32 @@ export const useAuthStore = create<AuthState>((set) => ({
   userRole: null,
 
   setUsuario: (usuario: UsuarioInfo, token: string) => {
+    const u: UsuarioInfo = {
+      ...usuario,
+      obrigar_troca_senha: Boolean(usuario.obrigar_troca_senha),
+    }
     Cookies.set("auth_token", token, COOKIE_OPTIONS)
-    Cookies.set("user_info", JSON.stringify(usuario), COOKIE_OPTIONS)
-    Cookies.set("clinic_id", usuario.clinic_id, COOKIE_OPTIONS)
-    Cookies.set("user_role", usuario.tipo_usuario, COOKIE_OPTIONS)
+    Cookies.set("user_info", JSON.stringify(u), COOKIE_OPTIONS)
+    Cookies.set("clinic_id", u.clinic_id, COOKIE_OPTIONS)
+    Cookies.set("user_role", u.tipo_usuario, COOKIE_OPTIONS)
     set({
-      usuario,
+      usuario: u,
       token,
       isAuthenticated: true,
-      clinicaId: usuario.clinic_id,
-      userRole: usuario.tipo_usuario as TipoUsuario,
+      clinicaId: u.clinic_id,
+      userRole: u.tipo_usuario as TipoUsuario,
+    })
+  },
+
+  patchUsuario: (partial: Partial<UsuarioInfo>) => {
+    set((state) => {
+      if (!state.usuario) return state
+      const next: UsuarioInfo = { ...state.usuario, ...partial }
+      Cookies.set("user_info", JSON.stringify(next), COOKIE_OPTIONS)
+      return {
+        usuario: next,
+        userRole: (next.tipo_usuario as TipoUsuario) ?? state.userRole,
+      }
     })
   },
 

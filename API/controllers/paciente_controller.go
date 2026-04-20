@@ -1,8 +1,10 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 
+	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	"github.com/ferrariwill/Clinicas/API/models"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
@@ -45,12 +47,20 @@ func (cc *PacienteController) Criar(c *gin.Context) {
 		return
 	}
 
-	if err := cc.service.CriarPaciente(&dto, clinicaID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+	paciente, err := cc.service.CriarPaciente(&dto, clinicaID)
+	if err != nil {
+		if errors.Is(err, services.ErrPacienteCPFDuplicado) {
+			c.JSON(http.StatusConflict, gin.H{"erro": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Paciente criado com sucesso"})
+	c.JSON(http.StatusCreated, gin.H{
+		"message":  "Paciente criado com sucesso",
+		"paciente": paciente,
+	})
 
 }
 
@@ -76,8 +86,14 @@ func (cc *PacienteController) Buscar(c *gin.Context) {
 
 	paciente, err := cc.service.BuscarPacientePorCPF(cpf, clinicaID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.SafeErrorMessage(err, "Não foi possível consultar paciente")})
 		return
+	}
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if papel == rbac.PapelSecretaria {
+		maskPacienteCPF(paciente)
+	} else if papel == "RECEPCAO" {
+		maskPacienteSensivel(paciente)
 	}
 
 	c.JSON(http.StatusOK, paciente)
@@ -102,21 +118,63 @@ func (cc *PacienteController) Listar(c *gin.Context) {
 
 	pacientes, err := cc.service.ListarPacientes(clinicaID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": utils.SafeErrorMessage(err, "Não foi possível listar pacientes")})
 		return
+	}
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if papel == rbac.PapelSecretaria {
+		for i := range pacientes {
+			maskPacienteCPF(&pacientes[i])
+		}
+	} else if papel == "RECEPCAO" {
+		for i := range pacientes {
+			maskPacienteSensivel(&pacientes[i])
+		}
 	}
 
 	c.JSON(http.StatusOK, pacientes)
 }
 
+func maskPacienteSensivel(p *models.Paciente) {
+	if p == nil {
+		return
+	}
+	p.CPF = utils.MaskCPF(p.CPF)
+	p.Telefone = utils.MaskTelefoneBR(p.Telefone)
+}
+
+func maskPacienteCPF(p *models.Paciente) {
+	if p == nil {
+		return
+	}
+	p.CPF = utils.MaskCPF(p.CPF)
+}
+
 func (cc *PacienteController) Atualizar(c *gin.Context) {
+	id, err := utils.StringParaUint(c.Param("id"))
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	var paciente models.Paciente
 	if err := c.ShouldBindJSON(&paciente); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
 		return
 	}
+	paciente.ID = uint(id)
+	paciente.ClinicaID = clinicaID
 
 	if err := cc.service.AtualizarPaciente(&paciente); err != nil {
+		if errors.Is(err, services.ErrPacienteCPFDuplicado) {
+			c.JSON(http.StatusConflict, gin.H{"erro": err.Error()})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

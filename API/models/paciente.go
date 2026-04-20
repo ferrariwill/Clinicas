@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Paciente struct {
 	gorm.Model
@@ -13,6 +17,8 @@ type Paciente struct {
 	Genero         string `json:"genero"`
 	ClinicaID      uint   `json:"clinica_id"`
 	Ativo          bool   `json:"ativo"`
+	DataConsentimento      *time.Time `json:"data_consentimento"`
+	PodeReceberNotificacoes bool      `json:"pode_receber_notificacoes" gorm:"default:false"`
 
 	Clinica    Clinica   `gorm:"foreignKey:ClinicaID" json:"clinica"`
 	ConvenioID *uint     `json:"convenio_id"`

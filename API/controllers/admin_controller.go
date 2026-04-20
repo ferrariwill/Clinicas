@@ -4,11 +4,15 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/ferrariwill/Clinicas/API/internal/retention"
 	"github.com/ferrariwill/Clinicas/API/models"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	servicedto "github.com/ferrariwill/Clinicas/API/models/DTO/ServiceDTO"
+	"github.com/ferrariwill/Clinicas/API/repositories"
 	"github.com/ferrariwill/Clinicas/API/services"
+	"github.com/ferrariwill/Clinicas/API/utils"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type AdminController struct {
@@ -16,19 +20,71 @@ type AdminController struct {
 	TelaService       services.TelaService
 	PlanoTelaService  services.PlanoTelaService
 	AssinaturaService services.AssinaturaService
+	AuditLogRepo      repositories.AuditLogRepository
+	DB                *gorm.DB
 }
 
 func NovoAdminController(planoService services.PlanoService,
 	telaService services.TelaService,
 	planoTelaService services.PlanoTelaService,
 	assinaturaService services.AssinaturaService,
+	auditLogRepo repositories.AuditLogRepository,
+	db *gorm.DB,
 ) AdminController {
 	return AdminController{
 		PlanoService:      planoService,
 		TelaService:       telaService,
 		PlanoTelaService:  planoTelaService,
 		AssinaturaService: assinaturaService,
+		AuditLogRepo:      auditLogRepo,
+		DB:                db,
 	}
+}
+
+// ListarAuditLogs retorna a trilha administrativa para responder "quem acessou o prontuário".
+// Filtros opcionais: usuario_id e paciente_id.
+func (ac AdminController) ListarAuditLogs(c *gin.Context) {
+	var usuarioID *uint
+	if s := c.Query("usuario_id"); s != "" {
+		v, err := utils.StringParaUint(s)
+		if err != nil || v == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "usuario_id inválido"})
+			return
+		}
+		usuarioID = &v
+	}
+	var pacienteID *uint
+	if s := c.Query("paciente_id"); s != "" {
+		v, err := utils.StringParaUint(s)
+		if err != nil || v == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "paciente_id inválido"})
+			return
+		}
+		pacienteID = &v
+	}
+	logs, err := ac.AuditLogRepo.ListarFiltrado(usuarioID, pacienteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao consultar trilha de auditoria"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"logs": logs})
+}
+
+// RunRetention dispara manualmente a política de retenção de dados.
+func (ac AdminController) RunRetention(c *gin.Context) {
+	if ac.DB == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Worker de retenção indisponível"})
+		return
+	}
+	report, err := retention.RunNow(ac.DB)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao executar retenção"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Retenção executada com sucesso",
+		"report":  report,
+	})
 }
 
 /*Assinaturas*/
@@ -49,13 +105,18 @@ func (ac AdminController) CriarAssinatura(c *gin.Context) {
 	if err := c.ShouldBindJSON(&assinaturaDto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Dados inválidos",
+			"detalhe": err.Error(),
 		})
 		return
 	}
 
-	assinatura := servicedto.CriarAssinaturaDTO_CriarAssinatura(assinaturaDto)
+	assinatura, err := servicedto.CriarAssinaturaDTO_CriarAssinatura(assinaturaDto)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	err := ac.AssinaturaService.Criar(&assinatura)
+	err = ac.AssinaturaService.Criar(&assinatura)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Erro ao criar a assinatura",

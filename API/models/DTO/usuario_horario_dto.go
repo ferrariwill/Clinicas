@@ -19,7 +19,7 @@ type UsuarioHorarioResponse struct {
 	Ativo         bool   `json:"ativo" example:"true"`
 }
 
-// DefinirHorariosRequest representa a requisição para definir todos os horários
+// DefinirHorariosRequest representa a requisição para definir todos os horários (lista vazia remove toda a grade).
 type DefinirHorariosRequest struct {
-	Horarios []UsuarioHorarioRequest `json:"horarios" binding:"required"`
+	Horarios []UsuarioHorarioRequest `json:"horarios" binding:"dive"`
 }

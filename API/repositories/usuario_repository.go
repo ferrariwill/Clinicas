@@ -9,8 +9,10 @@ type UsuarioRepository interface {
 	BuscarPorEmail(email string) (*models.Usuario, error)
 	BuscarPorID(id uint) (*models.Usuario, error)
 	AtualizarSenha(id uint, novaSenha string) error
+	DefinirSenhaEFlagTroca(id uint, hash string, obrigarTrocaSenha bool) error
 	CriarUsuario(u *models.Usuario) error
 	AtualizarUsuario(u *models.Usuario) error
+	AtualizarClinicaAtiva(usuarioID, clinicaID, tipoUsuarioID uint) error
 	ListarUsuarios(soAtivos *bool) ([]models.Usuario, error)
 	ListarPorClinica(clinicaID uint, soAtivos *bool) ([]models.Usuario, error)
 	DesativarUsuario(id uint) error
@@ -43,12 +45,18 @@ func (r *usuarioRepository) BuscarPorID(id uint) (*models.Usuario, error) {
 	return &usuario, nil
 }
 
-func (r *usuarioRepository) AtualizarSenha(usuarioID uint, novaSenha string) error {
-	err := r.db.Model(&models.Usuario{}).Where("id = ?", usuarioID).Update("senha", novaSenha).Error
-	if err != nil {
-		return err
-	}
-	return nil
+func (r *usuarioRepository) AtualizarSenha(usuarioID uint, novaSenhaHash string) error {
+	return r.db.Model(&models.Usuario{}).Where("id = ?", usuarioID).Updates(map[string]interface{}{
+		"senha":                novaSenhaHash,
+		"obrigar_troca_senha": false,
+	}).Error
+}
+
+func (r *usuarioRepository) DefinirSenhaEFlagTroca(usuarioID uint, hash string, obrigarTrocaSenha bool) error {
+	return r.db.Model(&models.Usuario{}).Where("id = ?", usuarioID).Updates(map[string]interface{}{
+		"senha":                hash,
+		"obrigar_troca_senha": obrigarTrocaSenha,
+	}).Error
 }
 
 func (r *usuarioRepository) CriarUsuario(u *models.Usuario) error {
@@ -61,6 +69,13 @@ func (r *usuarioRepository) AtualizarUsuario(u *models.Usuario) error {
 		return err
 	}
 	return nil
+}
+
+func (r *usuarioRepository) AtualizarClinicaAtiva(usuarioID, clinicaID, tipoUsuarioID uint) error {
+	return r.db.Model(&models.Usuario{}).Where("id = ?", usuarioID).Updates(map[string]interface{}{
+		"clinica_id":      clinicaID,
+		"tipo_usuario_id": tipoUsuarioID,
+	}).Error
 }
 
 func (r *usuarioRepository) ListarUsuarios(soAtivos *bool) ([]models.Usuario, error) {
@@ -78,17 +93,25 @@ func (r *usuarioRepository) ListarUsuarios(soAtivos *bool) ([]models.Usuario, er
 }
 
 func (r *usuarioRepository) ListarPorClinica(clinicaID uint, soAtivos *bool) ([]models.Usuario, error) {
-	var usuarios []models.Usuario
-	var err error
-	if soAtivos == nil {
-		err = r.db.Preload("TipoUsuario").Where("clinica_id = ?", clinicaID).Find(&usuarios).Error
-	} else {
-		err = r.db.Preload("TipoUsuario").Where("clinica_id = ? AND ativo = ?", clinicaID, *soAtivos).Find(&usuarios).Error
-	}
+	var ucs []models.UsuarioClinica
+	err := r.db.Preload("Usuario").Preload("TipoUsuario").
+		Where("clinica_id = ? AND ativo = ?", clinicaID, true).
+		Find(&ucs).Error
 	if err != nil {
 		return nil, err
 	}
-	return usuarios, nil
+	out := make([]models.Usuario, 0, len(ucs))
+	for _, uc := range ucs {
+		u := uc.Usuario
+		if soAtivos != nil && u.Ativo != *soAtivos {
+			continue
+		}
+		u.ClinicaID = uc.ClinicaID
+		u.TipoUsuarioID = uc.TipoUsuarioID
+		u.TipoUsuario = uc.TipoUsuario
+		out = append(out, u)
+	}
+	return out, nil
 }
 
 func (r *usuarioRepository) DesativarUsuario(id uint) error {

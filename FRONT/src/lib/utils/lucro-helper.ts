@@ -31,13 +31,15 @@ export function calcularSaldoTotal(
 }
 
 /**
- * Retorna o lucro mais preciso considerando ambas as fontes de dados
+ * Preferência explícita pelo saldo do módulo financeiro (inclui zero: mês equilibrado).
+ * `lucroCalculadoAgenda` só entra em jogo se o saldo não for um número finito.
  */
 export function obterLucroFinal(
   lucroCalculadoAgenda: number,
   saldoModuloFinanceiro: number
 ): number {
-  // Usa o saldo do módulo financeiro se disponível (mais completo)
-  // pois ele inclui receitas/despesas manuais
-  return saldoModuloFinanceiro || lucroCalculadoAgenda
+  if (Number.isFinite(saldoModuloFinanceiro)) {
+    return saldoModuloFinanceiro
+  }
+  return lucroCalculadoAgenda
 }

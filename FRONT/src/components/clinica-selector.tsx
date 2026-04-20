@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useCallback, useEffect, useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { apiClient } from "@/services/api-client"
-import { ClinicaResponse } from "@/types/api"
+import type { MinhaClinicaAuth } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { Building2 } from "lucide-react"
 import { toast } from "sonner"
@@ -15,56 +15,75 @@ interface ClinicaSelectorProps {
 export const ClinicaSelector: React.FC<ClinicaSelectorProps> = ({
   onClinicaChange,
 }) => {
-  const { userRole, clinicaId, changeClinica } = useAuth()
-  const [clinicas, setClinicas] = useState<ClinicaResponse[]>([])
+  const { userRole, clinicaId, trocarClinicaAtiva, isAuthenticated } = useAuth()
+  const [clinicas, setClinicas] = useState<MinhaClinicaAuth[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [showSwitcher, setShowSwitcher] = useState(false)
+
+  const loadClinicas = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const { clinicas: list } = await apiClient.getMinhasClinicas()
+      setClinicas(list)
+      setShowSwitcher(userRole === "ADM_GERAL" || list.length > 1)
+    } catch {
+      toast.error("Erro ao carregar clínicas")
+      setClinicas([])
+      setShowSwitcher(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [userRole])
 
   useEffect(() => {
-    const loadClinicas = async () => {
-      setIsLoading(true)
-      try {
-        const data = await apiClient.getClinicas()
-        setClinicas(Array.isArray(data) ? data : data.clinicas || [])
-      } catch {
-        toast.error("Erro ao carregar clínicas")
-      } finally {
-        setIsLoading(false)
-      }
+    if (!isAuthenticated) {
+      setClinicas([])
+      setShowSwitcher(false)
+      return
     }
+    void loadClinicas()
+  }, [isAuthenticated, loadClinicas])
 
-    if (isOpen && clinicas.length === 0) {
-      loadClinicas()
+  const toggleOpen = () => {
+    const next = !isOpen
+    setIsOpen(next)
+    if (next && clinicas.length === 0) {
+      void loadClinicas()
     }
-  }, [isOpen, clinicas.length])
+  }
 
-  // Only show for ADM_GERAL
-  if (userRole !== "ADM_GERAL") {
+  if (!showSwitcher) {
     return null
   }
 
-  const selectedClinica = clinicas.find((c) => c.id === clinicaId)
+  const selectedClinica = clinicas.find(
+    (c) => String(c.clinica_id) === clinicaId
+  )
 
-  const handleSelectClinica = (novaClinicaId: string) => {
-    changeClinica(novaClinicaId)
-    onClinicaChange?.(novaClinicaId)
-    setIsOpen(false)
-    toast.success("Clínica alterada com sucesso")
+  const handleSelectClinica = async (novaClinicaId: string) => {
+    const res = await trocarClinicaAtiva(novaClinicaId)
+    if (res.success) {
+      onClinicaChange?.(novaClinicaId)
+      setIsOpen(false)
+    }
   }
 
   return (
     <div className="relative inline-block">
       <Button
         variant="outline"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         className="flex items-center gap-2"
         disabled={isLoading}
       >
         <Building2 className="w-4 h-4" />
         <span className="hidden sm:inline">
-          {selectedClinica?.nome || "Selecionar Clínica"}
+          {selectedClinica?.nome || "Selecionar clínica"}
         </span>
-        <span className="sm:hidden">{selectedClinica?.nome?.split(' ')[0]}</span>
+        <span className="sm:hidden">
+          {selectedClinica?.nome?.split(" ")[0] ?? "Clínica"}
+        </span>
       </Button>
 
       {isOpen && (
@@ -79,20 +98,24 @@ export const ClinicaSelector: React.FC<ClinicaSelectorProps> = ({
                 Nenhuma clínica encontrada
               </div>
             ) : (
-              clinicas.map((clinica) => (
-                <button
-                  key={clinica.id}
-                  onClick={() => handleSelectClinica(clinica.id)}
-                  className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition ${
-                    clinica.id === clinicaId ? "bg-blue-50" : ""
-                  }`}
-                >
-                  <div className="font-medium text-gray-900">{clinica.nome}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {clinica.email}
-                  </div>
-                </button>
-              ))
+              clinicas.map((clinica) => {
+                const idStr = String(clinica.clinica_id)
+                return (
+                  <button
+                    key={idStr}
+                    type="button"
+                    onClick={() => handleSelectClinica(idStr)}
+                    className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition ${
+                      idStr === clinicaId ? "bg-blue-50" : ""
+                    }`}
+                  >
+                    <div className="font-medium text-gray-900">{clinica.nome}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {clinica.email || `ID ${idStr}`}
+                    </div>
+                  </button>
+                )
+              })
             )}
           </div>
         </div>

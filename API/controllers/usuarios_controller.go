@@ -1,26 +1,124 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
+	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	"github.com/ferrariwill/Clinicas/API/models"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	"github.com/ferrariwill/Clinicas/API/services"
+	"github.com/ferrariwill/Clinicas/API/utils"
 	"github.com/gin-gonic/gin"
 )
 
-type UsuarioController struct {
-	usuarioService services.UsuarioService
-	horarioService services.UsuarioHorarioService
+type atualizarUsuarioBody struct {
+	Nome              *string `json:"nome"`
+	Email             *string `json:"email"`
+	Senha             *string `json:"senha"`
+	TipoUsuarioID     *uint   `json:"tipo_usuario_id"`
+	MaxPacientes      *int    `json:"max_pacientes"`
+	PermiteSimultaneo *bool   `json:"permite_simultaneo"`
 }
 
-func NovoUsuarioController(usuarioService services.UsuarioService, horarioService services.UsuarioHorarioService) *UsuarioController {
+func podeGerenciarEquipeUsuario(papel string) bool {
+	return papel == rbac.PapelDono || papel == rbac.PapelADMGeral
+}
+
+type UsuarioController struct {
+	usuarioService     services.UsuarioService
+	horarioService     services.UsuarioHorarioService
+	assinaturaService  services.AssinaturaService
+	planoService       services.PlanoService
+}
+
+func NovoUsuarioController(
+	usuarioService services.UsuarioService,
+	horarioService services.UsuarioHorarioService,
+	assinaturaService services.AssinaturaService,
+	planoService services.PlanoService,
+) *UsuarioController {
 	return &UsuarioController{
-		usuarioService: usuarioService,
-		horarioService: horarioService,
+		usuarioService:    usuarioService,
+		horarioService:    horarioService,
+		assinaturaService: assinaturaService,
+		planoService:      planoService,
 	}
+}
+
+func (uc *UsuarioController) verificarLimiteUsuariosClinica(clinicaID uint) error {
+	if uc.assinaturaService == nil || uc.planoService == nil {
+		return nil
+	}
+	ptr, err := uc.assinaturaService.Consultar(&clinicaID, nil)
+	if err != nil || ptr == nil || len(*ptr) == 0 {
+		return nil
+	}
+	var ativa *models.Assinatura
+	for i := range *ptr {
+		a := &(*ptr)[i]
+		if a.Ativa {
+			ativa = a
+			break
+		}
+	}
+	if ativa == nil {
+		return nil
+	}
+	plano, err := uc.planoService.BuscarPorId(int(ativa.PlanoID))
+	if err != nil || plano == nil || plano.LimiteUsuarios <= 0 {
+		return nil
+	}
+	soAtivos := true
+	lista, err := uc.usuarioService.ListarPorClinica(clinicaID, &soAtivos)
+	if err != nil {
+		return err
+	}
+	n := 0
+	for _, u := range lista {
+		if u.TipoUsuario.Papel == rbac.PapelDono {
+			continue
+		}
+		n++
+	}
+	if n >= plano.LimiteUsuarios {
+		return fmt.Errorf("limite de usuários do plano atingido (%d). Atualize o plano ou desative um usuário", plano.LimiteUsuarios)
+	}
+	return nil
+}
+
+func (uc *UsuarioController) contextoClinica(c *gin.Context) (clinicaID uint, actorID uint, papel string, ok bool) {
+	var err error
+	clinicaID, err = middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "clinica_id inválido no token"})
+		return 0, 0, "", false
+	}
+	actorID, err = middleware.ExtrairDoToken[uint](c, "usuario_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
+		return 0, 0, "", false
+	}
+	papel, _ = middleware.ExtrairDoToken[string](c, "papel")
+	return clinicaID, actorID, papel, true
+}
+
+func (uc *UsuarioController) podeAcessarAlvo(c *gin.Context, alvo *models.Usuario, clinicaID, actorID uint, papel string) bool {
+	ok, err := uc.usuarioService.PertenceAClinica(alvo.ID, clinicaID)
+	if err != nil || !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Usuário não pertence à sua clínica"})
+		return false
+	}
+	if alvo.ID == actorID {
+		return true
+	}
+	if !podeGerenciarEquipeUsuario(papel) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Sem permissão para gerenciar este usuário"})
+		return false
+	}
+	return true
 }
 
 // @Summary Criar usuário
@@ -45,6 +143,11 @@ func (uc *UsuarioController) Criar(c *gin.Context) {
 	clinicaId, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := uc.verificarLimiteUsuariosClinica(clinicaId); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -108,9 +211,18 @@ func (uc *UsuarioController) Buscar(c *gin.Context) {
 		return
 	}
 
+	clinicaID, actorID, papel, ok := uc.contextoClinica(c)
+	if !ok {
+		return
+	}
+
 	usuario, err := uc.usuarioService.BuscarPorID(uint(usuarioId))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !uc.podeAcessarAlvo(c, usuario, clinicaID, actorID, papel) {
 		return
 	}
 
@@ -137,19 +249,79 @@ func (uc *UsuarioController) Atualizar(c *gin.Context) {
 		return
 	}
 
-	var u models.Usuario
-	u.ID = uint(usuarioId)
-	if err := c.ShouldBindJSON(&u); err != nil {
+	clinicaID, actorID, papel, ok := uc.contextoClinica(c)
+	if !ok {
+		return
+	}
+
+	existente, err := uc.usuarioService.BuscarPorID(uint(usuarioId))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if !uc.podeAcessarAlvo(c, existente, clinicaID, actorID, papel) {
+		return
+	}
+
+	var body atualizarUsuarioBody
+	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := uc.usuarioService.AtualizarUsuario(&u); err != nil {
+	if body.Nome != nil {
+		existente.Nome = *body.Nome
+	}
+	if body.Email != nil {
+		existente.Email = *body.Email
+	}
+	if body.Senha != nil && *body.Senha != "" {
+		hash, err := utils.HashSenha(*body.Senha)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar senha"})
+			return
+		}
+		existente.Senha = hash
+	}
+	var novoTipo *uint
+	if body.TipoUsuarioID != nil {
+		tipoNaClinica, err := uc.usuarioService.BuscarTipoNaClinica(uint(usuarioId), clinicaID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Usuário sem vínculo com esta clínica"})
+			return
+		}
+		if *body.TipoUsuarioID != tipoNaClinica && !podeGerenciarEquipeUsuario(papel) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Sem permissão para alterar o tipo de usuário"})
+			return
+		}
+		novoTipo = body.TipoUsuarioID
+	}
+	if body.MaxPacientes != nil && (podeGerenciarEquipeUsuario(papel) || existente.ID == actorID) {
+		existente.MaxPacientes = *body.MaxPacientes
+	}
+	if body.PermiteSimultaneo != nil && (podeGerenciarEquipeUsuario(papel) || existente.ID == actorID) {
+		existente.PermiteSimultaneo = *body.PermiteSimultaneo
+	}
+
+	if err := uc.usuarioService.AtualizarUsuario(existente); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"usuario": u})
+	if novoTipo != nil {
+		if err := uc.usuarioService.AtualizarTipoUsuarioNaClinica(uint(usuarioId), clinicaID, *novoTipo); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	atualizado, err := uc.usuarioService.BuscarPorID(uint(usuarioId))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	atualizado.Senha = ""
+	c.JSON(http.StatusOK, gin.H{"usuario": atualizado})
 }
 
 // @Summary Desativar usuário
@@ -171,6 +343,24 @@ func (uc *UsuarioController) Deletar(c *gin.Context) {
 		return
 	}
 
+	clinicaID, actorID, papel, ok := uc.contextoClinica(c)
+	if !ok {
+		return
+	}
+
+	alvo, err := uc.usuarioService.BuscarPorID(uint(usuarioId))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if !uc.podeAcessarAlvo(c, alvo, clinicaID, actorID, papel) {
+		return
+	}
+	if alvo.ID == actorID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Não é possível desativar o próprio usuário"})
+		return
+	}
+
 	if err := uc.usuarioService.DesativarUsuario(uint(usuarioId)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -184,6 +374,20 @@ func (uc *UsuarioController) Ativar(c *gin.Context) {
 	usuarioId, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	clinicaID, actorID, papel, ok := uc.contextoClinica(c)
+	if !ok {
+		return
+	}
+
+	alvo, err := uc.usuarioService.BuscarPorID(uint(usuarioId))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if !uc.podeAcessarAlvo(c, alvo, clinicaID, actorID, papel) {
 		return
 	}
 
@@ -223,13 +427,22 @@ func (uc *UsuarioController) CriarUsuarioClinica(c *gin.Context) {
 		return
 	}
 
-	usuario, err := uc.usuarioService.CriarUsuarioClinica(dto, usuarioClinicaID)
+	if err := uc.verificarLimiteUsuariosClinica(usuarioClinicaID); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	usuario, emailEnviado, err := uc.usuarioService.CriarUsuarioClinica(dto, usuarioClinicaID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar usuário"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	usuario.Senha = ""
-	c.JSON(http.StatusCreated, usuario)
+	c.JSON(http.StatusCreated, gin.H{
+		"usuario":        usuario,
+		"email_enviado":  emailEnviado,
+		"obrigar_troca": usuario.ObrigarTrocaSenha,
+	})
 }
 
 // @Summary Buscar horários do usuário
@@ -248,6 +461,19 @@ func (uc *UsuarioController) BuscarHorarios(c *gin.Context) {
 	usuarioId, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	clinicaID, actorID, papel, ok := uc.contextoClinica(c)
+	if !ok {
+		return
+	}
+	alvo, err := uc.usuarioService.BuscarPorID(uint(usuarioId))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if !uc.podeAcessarAlvo(c, alvo, clinicaID, actorID, papel) {
 		return
 	}
 
@@ -277,6 +503,19 @@ func (uc *UsuarioController) DefinirHorarios(c *gin.Context) {
 	usuarioId, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	clinicaID, actorID, papel, ok := uc.contextoClinica(c)
+	if !ok {
+		return
+	}
+	alvo, err := uc.usuarioService.BuscarPorID(uint(usuarioId))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if !uc.podeAcessarAlvo(c, alvo, clinicaID, actorID, papel) {
 		return
 	}
 

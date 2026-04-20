@@ -22,4 +22,6 @@ type Agenda struct {
 	StatusAgendamentoID uint              `json:"status_id"`
 	StatusAgendamento   StatusAgendamento `gorm:"foreignKey:StatusAgendamentoID"`
 	Observacoes         string            `json:"observacoes"`
+	// ProcedimentosExtras complementa ProcedimentoID (múltiplos procedimentos no mesmo horário).
+	ProcedimentosExtras []AgendaProcedimento `gorm:"foreignKey:AgendaID" json:"procedimentos_extras,omitempty"`
 }

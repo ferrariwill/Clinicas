@@ -197,11 +197,28 @@ func (r *dashboardRepository) ObterProcedimentosPopulares(clinicaID uint, limite
 
 func (r *dashboardRepository) CalcularFaturamentoPeriodo(clinicaID uint, inicio, fim time.Time) (float64, error) {
 	var total float64
-	err := r.db.Table("agendas").
-		Select("COALESCE(SUM(procedimentos.valor), 0)").
-		Joins("JOIN procedimentos ON agendas.procedimento_id = procedimentos.id").
-		Where("agendas.clinica_id = ? AND agendas.data_hora >= ? AND agendas.data_hora < ?", clinicaID, inicio, fim).
-		Scan(&total).Error
+	// LOWER(TRIM(s.nome)): bases antigas podem divergir de "Realizado" canônico.
+	// COALESCE em cada parcela: no PostgreSQL (subselect sem linha) + NULL = NULL, o que zerava a soma mesmo com extras.
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(sub.valor_linha), 0) FROM (
+			SELECT a.id,
+				COALESCE((
+					SELECT p.valor FROM procedimentos p
+					WHERE p.id = a.procedimento_id AND p.clinica_id = a.clinica_id AND p.deleted_at IS NULL
+					LIMIT 1
+				), 0)
+				+ COALESCE((
+					SELECT SUM(p2.valor) FROM agenda_procedimentos ap
+					INNER JOIN procedimentos p2 ON p2.id = ap.procedimento_id AND p2.clinica_id = a.clinica_id AND p2.deleted_at IS NULL
+					WHERE ap.agenda_id = a.id
+				), 0) AS valor_linha
+			FROM agendas a
+			INNER JOIN status_agendamentos s ON s.id = a.status_agendamento_id AND s.deleted_at IS NULL
+				AND LOWER(TRIM(s.nome)) = 'realizado'
+			WHERE a.clinica_id = ? AND a.deleted_at IS NULL AND a.data_hora >= ? AND a.data_hora < ?
+		) sub`,
+		clinicaID, inicio, fim,
+	).Scan(&total).Error
 	return total, err
 }
 

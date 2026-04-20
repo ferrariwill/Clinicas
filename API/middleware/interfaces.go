@@ -8,4 +8,5 @@ type PlanoTelaChecker interface {
 // PermissaoTelaChecker interface para verificação de permissões por tipo de usuário
 type PermissaoTelaChecker interface {
 	VerificarPermissaoTipoUsuario(tipoUsuarioID uint, rota string) (bool, error)
+	ListarRotasPermitidas(tipoUsuarioID uint) (rotas []string, acessoTotal bool, err error)
 }

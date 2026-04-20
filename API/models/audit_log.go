@@ -7,6 +7,7 @@ type AuditLog struct {
 	gorm.Model
 	ClinicaID uint   `gorm:"index"`
 	UsuarioID uint   `gorm:"index"`
+	PacienteID *uint `gorm:"index"`
 	Acao      string `gorm:"size:64;index"`
 	Recurso   string `gorm:"size:64"`
 	RecursoID *uint

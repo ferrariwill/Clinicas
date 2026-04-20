@@ -1,19 +1,21 @@
 package servicedto
 
 import (
+	"time"
+
 	"github.com/ferrariwill/Clinicas/API/models"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 )
 
-func CriarAgendaDTO_CriarAgenda(dto dto.CriarAgendaDTO, clinicaID uint) models.Agenda {
+func CriarAgendaDTO_CriarAgenda(d dto.CriarAgendaDTO, clinicaID uint, dataHora time.Time) models.Agenda {
 	agenda := models.Agenda{
-		PacienteID:          dto.PacienteID,
-		UsuarioID:           dto.UsuarioID,
+		PacienteID:          d.PacienteID,
+		UsuarioID:           d.UsuarioID,
 		ClinicaID:           clinicaID,
-		ProcedimentoID:      dto.ProcedimentoID,
-		DataHora:            dto.DataHora,
-		Observacoes:         dto.Observacoes,
-		StatusAgendamentoID: dto.StatusID,
+		ProcedimentoID:      d.ProcedimentoID,
+		DataHora:            dataHora,
+		Observacoes:         d.Observacoes,
+		StatusAgendamentoID: d.StatusID,
 	}
 	return agenda
 }

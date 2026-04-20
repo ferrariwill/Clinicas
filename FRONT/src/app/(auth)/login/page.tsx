@@ -28,8 +28,14 @@ export default function LoginPage() {
     const result = await login(email, senha)
 
     if (result.success) {
-      toast.success("Login realizado com sucesso!")
-      const papel = result.data?.usuario?.papel
+      toast.success("LOGIN REALIZADO COM SUCESSO.")
+      const data = result.data as { usuario?: { obrigar_troca_senha?: boolean; tipo_usuario?: string; papel?: string } }
+      const obrigar = Boolean(data?.usuario?.obrigar_troca_senha)
+      if (obrigar) {
+        router.replace("/trocar-senha")
+        return
+      }
+      const papel = data?.usuario?.papel ?? data?.usuario?.tipo_usuario
       router.push(papel === "ADM_GERAL" ? "/admin/dashboard" : "/dashboard")
     }
 

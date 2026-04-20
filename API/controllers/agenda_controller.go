@@ -3,6 +3,8 @@ package controllers
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ferrariwill/Clinicas/API/internal/audit"
@@ -39,7 +41,7 @@ func NovaAgendaController(service services.AgendaService) *AgendaController {
 func (ac AgendaController) Criar(c *gin.Context) {
 	var agendaDTO dto.CriarAgendaDTO
 	if err := c.ShouldBindJSON(&agendaDTO); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos", "detalhes": err.Error()})
 		return
 	}
 
@@ -49,10 +51,30 @@ func (ac AgendaController) Criar(c *gin.Context) {
 		return
 	}
 
-	agendamento := servicedto.CriarAgendaDTO_CriarAgenda(agendaDTO, clinicaID)
-	agenda, err := ac.service.Criar(agendamento)
+	ids := agendaDTO.ProcedimentoIDs
+	if len(ids) == 0 {
+		if agendaDTO.ProcedimentoID == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Informe procedimento_id ou procedimento_ids"})
+			return
+		}
+		ids = []uint{agendaDTO.ProcedimentoID}
+	}
+	agendaDTO.ProcedimentoID = ids[0]
+	extras := []uint{}
+	if len(ids) > 1 {
+		extras = ids[1:]
+	}
+
+	dataHora, err := utils.ParseAgendaDataHora(agendaDTO.DataHora)
 	if err != nil {
-		if errors.Is(err, repositories.ErrConflitoAgendamento) {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		return
+	}
+
+	agendamento := servicedto.CriarAgendaDTO_CriarAgenda(agendaDTO, clinicaID, dataHora)
+	agenda, err := ac.service.Criar(agendamento, extras)
+	if err != nil {
+		if errors.Is(err, repositories.ErrConflitoAgendamento) || errors.Is(err, repositories.ErrCapacidadeAgendaExcedida) {
 			c.JSON(http.StatusConflict, gin.H{"erro": err.Error()})
 			return
 		}
@@ -80,12 +102,25 @@ func (ac AgendaController) Listar(c *gin.Context) {
 		return
 	}
 
-	agendas, err := ac.service.Listar(clinicaID)
+	var dia *time.Time
+	if ds := c.Query("data"); ds != "" {
+		if parsed, e := time.ParseInLocation("2006-01-02", ds, utils.LocSaoPaulo()); e == nil {
+			dia = &parsed
+		}
+	}
+	var usuarioFiltro *uint
+	if us := c.Query("usuario_id"); us != "" {
+		if u, err := utils.StringParaUint(us); err == nil && u > 0 {
+			usuarioFiltro = &u
+		}
+	}
+
+	agendas, err := ac.service.Listar(clinicaID, dia, usuarioFiltro)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, agendas)
+	c.JSON(http.StatusOK, gin.H{"agendamentos": agendas})
 }
 
 // @Summary Atualizar status do agendamento
@@ -113,7 +148,8 @@ func (ac AgendaController) AtualizarStatus(c *gin.Context) {
 	}
 
 	var body struct {
-		StatusID uint `json:"status_id"`
+		StatusID uint   `json:"status_id"`
+		Status   string `json:"status"`
 	}
 
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -126,8 +162,31 @@ func (ac AgendaController) AtualizarStatus(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
 		return
 	}
+	usuarioID, err := middleware.ExtrairDoToken[uint](c, "usuario_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
+		return
+	}
 
-	if err := ac.service.AtualizarStatus(clinicaID, id, body.StatusID); err != nil {
+	stID := body.StatusID
+	if stID == 0 && strings.TrimSpace(body.Status) != "" {
+		nome := strings.TrimSpace(body.Status)
+		if strings.EqualFold(nome, "FALTOU") || strings.EqualFold(nome, "FALTADO") {
+			nome = "Falta"
+		}
+		var errSt error
+		stID, errSt = ac.service.StatusIDPorNome(nome)
+		if errSt != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"erro": "Status inválido"})
+			return
+		}
+	}
+	if stID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "Informe status_id ou status"})
+		return
+	}
+
+	if err := ac.service.AtualizarStatus(clinicaID, id, stID, usuarioID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"erro": "Agendamento não encontrado para esta clínica"})
 			return
@@ -171,17 +230,30 @@ func (ac AgendaController) HorariosDisponiveis(c *gin.Context) {
 	}
 
 	dataStr := c.Query("data") // formato YYYY-MM-DD
-	data, err := time.Parse("2006-01-02", dataStr)
+	data, err := time.ParseInLocation("2006-01-02", dataStr, utils.LocSaoPaulo())
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Data inválida"})
 		return
 	}
 
-	horarios, err := ac.service.HorariosDisponiveis(usuarioID, clinicaID, procedimentoID, data)
+	var duracaoTotal uint
+	if ds := strings.TrimSpace(c.Query("duracao_total")); ds != "" {
+		if v, e := strconv.ParseUint(ds, 10, 32); e == nil && v > 0 {
+			duracaoTotal = uint(v)
+		}
+	}
+
+	horarios, err := ac.service.HorariosDisponiveis(usuarioID, clinicaID, procedimentoID, data, duracaoTotal)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, horarios)
+	// Sempre HH:mm no relógio de Brasília (evita Location=UTC no time.Time vindo do repositório).
+	slots := make([]string, 0, len(horarios))
+	br := utils.LocSaoPaulo()
+	for _, t := range horarios {
+		slots = append(slots, t.In(br).Format("15:04"))
+	}
+	c.JSON(http.StatusOK, slots)
 }

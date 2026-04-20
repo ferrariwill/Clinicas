@@ -3,9 +3,11 @@ package main
 import (
 	"log"
 	"os"
+	_ "time/tzdata" // IANA em binário estático (ex.: Alpine sem pacote tzdata) para America/Sao_Paulo na agenda
 
 	"github.com/ferrariwill/Clinicas/API/database"
 	_ "github.com/ferrariwill/Clinicas/API/docs"
+	"github.com/ferrariwill/Clinicas/API/internal/retention"
 	"github.com/ferrariwill/Clinicas/API/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -23,9 +25,11 @@ import (
 // @name Authorization
 func main() {
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Arquivo .env não encontrado")
+	// Monorepo: .env costuma ficar na raiz (../.env) quando o cwd é API/; também tenta ./.env
+	if err := godotenv.Load(); err != nil {
+		if err2 := godotenv.Load("../.env"); err2 != nil {
+			log.Println("Arquivo .env não encontrado em ./ nem em ../ (use variáveis de ambiente ou crie .env na raiz ou em API/)")
+		}
 	}
 
 	db := database.ConnectDB()
@@ -45,6 +49,7 @@ func main() {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	routes.SetupRoutes(r, db)
+	retention.StartWorker(db)
 
 	port := os.Getenv("PORT")
 	if port == "" {

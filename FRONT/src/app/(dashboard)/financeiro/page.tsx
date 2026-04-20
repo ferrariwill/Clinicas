@@ -1,11 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/hooks/use-auth"
-import { useLancamentosFinanceiros, useResumoFinanceiro, useCriarLancamento } from "@/hooks/use-financeiro"
-import { LancamentoFinanceiro, FiltrosFinanceiro } from "@/types/api"
+import {
+  useLancamentosFinanceiros,
+  useResumoFinanceiro,
+  useCriarLancamento,
+  useCustosFixos,
+  useCriarCustoFixo,
+  useAtualizarCustoFixo,
+} from "@/hooks/use-financeiro"
+import { LancamentoFinanceiro, FiltrosFinanceiro, ResumoFinanceiro, CustoFixo } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -21,9 +28,19 @@ import {
   TrendingDown,
   Download,
   Filter,
-  EyeOff
+  EyeOff,
+  Building2,
+  Pencil,
 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  maskDataBR,
+  maskMoedaBRL,
+  dataBRToISO,
+  dataISOToBR,
+  parseMoedaBRL,
+  digitsOnly,
+} from "@/lib/utils/masks"
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -32,19 +49,33 @@ const formatCurrency = (value: number) => {
   }).format(value)
 }
 
-const canViewFullFinancials = (userType: string) => {
-  return ['DONO_CLINICA', 'ADM_GERAL'].includes(userType)
+const canViewFullFinancials = (userType: string, userRole?: string | null) => {
+  const r = userRole ?? ""
+  if (r === "DONO") return true
+  return ["DONO", "DONO_CLINICA", "ADM_GERAL"].includes(userType)
 }
 
-const canViewLancamento = (lancamento: LancamentoFinanceiro, userId: string, userType: string) => {
-  if (canViewFullFinancials(userType)) return true
+const canViewLancamento = (
+  lancamento: LancamentoFinanceiro,
+  userId: string,
+  userType: string,
+  role?: string | null
+) => {
+  if (canViewFullFinancials(userType, role)) return true
   return lancamento.usuario_id === userId
 }
 
 export default function FinanceiroPage() {
-  const { usuario } = useAuth()
+  const { usuario, userRole } = useAuth()
   const [openDialog, setOpenDialog] = useState(false)
+  const [openCustoFixo, setOpenCustoFixo] = useState(false)
+  const [editCusto, setEditCusto] = useState<CustoFixo | null>(null)
+  const [novoCusto, setNovoCusto] = useState({ descricao: "", valor: "" })
+  const [editForm, setEditForm] = useState({ descricao: "", valor: "", ativo: true })
   const [filtros, setFiltros] = useState<FiltrosFinanceiro>({})
+  const [filtroInicioBR, setFiltroInicioBR] = useState("")
+  const [filtroFimBR, setFiltroFimBR] = useState("")
+  const [dataLancBR, setDataLancBR] = useState("")
   const [newLancamento, setNewLancamento] = useState({
     descricao: '',
     valor: '',
@@ -55,26 +86,62 @@ export default function FinanceiroPage() {
 
   const { data: lancamentos, isLoading: loadingLancamentos } = useLancamentosFinanceiros(filtros)
   const { data: resumo, isLoading: loadingResumo } = useResumoFinanceiro(filtros.dataInicio, filtros.dataFim)
+  const { data: custosFixos, isLoading: loadingCustosFixos } = useCustosFixos()
   const criarLancamento = useCriarLancamento()
+  const criarCustoFixo = useCriarCustoFixo()
+  const atualizarCustoFixo = useAtualizarCustoFixo()
+
+  useEffect(() => {
+    setFiltroInicioBR(filtros.dataInicio ? dataISOToBR(filtros.dataInicio) : "")
+  }, [filtros.dataInicio])
+
+  useEffect(() => {
+    setFiltroFimBR(filtros.dataFim ? dataISOToBR(filtros.dataFim) : "")
+  }, [filtros.dataFim])
+
+  useEffect(() => {
+    if (openDialog) {
+      setDataLancBR(dataISOToBR(newLancamento.data))
+    }
+  }, [openDialog, newLancamento.data])
 
   const lancamentosTyped = (lancamentos ?? []) as LancamentoFinanceiro[]
 
   // Filtrar lançamentos baseado nas permissões
   const lancamentosFiltrados = lancamentosTyped.filter((lancamento: LancamentoFinanceiro) =>
-    canViewLancamento(lancamento, usuario?.id || '', usuario?.tipo_usuario || '')
+    canViewLancamento(lancamento, usuario?.id || "", usuario?.tipo_usuario || "", userRole)
   )
 
+  const podeVerTudo = canViewFullFinancials(usuario?.tipo_usuario || "", userRole)
+  const resumoTyped = (resumo ?? {}) as ResumoFinanceiro
+
   // Calcular totais visíveis baseado nas permissões
-  const totaisVisiveis: { totalEntradas: number; totalSaidas: number; saldoLiquido: number } = canViewFullFinancials(usuario?.tipo_usuario || '')
-    ? (resumo as { totalEntradas: number; totalSaidas: number; saldoLiquido: number }) || { totalEntradas: 0, totalSaidas: 0, saldoLiquido: 0 }
+  const totaisVisiveis: {
+    totalEntradas: number
+    totalSaidas: number
+    saldoLiquido: number
+    totalSaidasLancamentos?: number
+    custosFixosNoPeriodo?: number
+    custosFixosMensal?: number
+    mesesNoPeriodo?: number
+  } = podeVerTudo
+    ? {
+        totalEntradas: resumoTyped.totalEntradas ?? 0,
+        totalSaidasLancamentos: resumoTyped.totalSaidasLancamentos ?? resumoTyped.totalSaidas ?? 0,
+        custosFixosMensal: resumoTyped.custosFixosMensal ?? 0,
+        custosFixosNoPeriodo: resumoTyped.custosFixosNoPeriodo ?? 0,
+        mesesNoPeriodo: resumoTyped.mesesNoPeriodo ?? 1,
+        totalSaidas: resumoTyped.totalSaidas ?? 0,
+        saldoLiquido: resumoTyped.saldoLiquido ?? 0,
+      }
     : {
         totalEntradas: lancamentosFiltrados
-          .filter((l: LancamentoFinanceiro) => l.tipo === 'RECEITA')
+          .filter((l: LancamentoFinanceiro) => l.tipo === "RECEITA")
           .reduce((sum: number, l: LancamentoFinanceiro) => sum + l.valor, 0),
         totalSaidas: lancamentosFiltrados
-          .filter((l: LancamentoFinanceiro) => l.tipo === 'DESPESA')
+          .filter((l: LancamentoFinanceiro) => l.tipo === "DESPESA")
           .reduce((sum: number, l: LancamentoFinanceiro) => sum + l.valor, 0),
-        saldoLiquido: 0
+        saldoLiquido: 0,
       }
 
   const handleCreateLancamento = async (e: React.FormEvent) => {
@@ -85,15 +152,22 @@ export default function FinanceiroPage() {
       return
     }
 
-    const valor = parseFloat(newLancamento.valor.replace(',', '.'))
-    if (isNaN(valor) || valor <= 0) {
+    const valor = parseMoedaBRL(newLancamento.valor)
+    if (Number.isNaN(valor) || valor <= 0) {
       toast.error("Valor deve ser um número positivo")
+      return
+    }
+
+    const dataIso = dataBRToISO(dataLancBR.trim()) || newLancamento.data
+    if (!dataIso || !/^\d{4}-\d{2}-\d{2}$/.test(dataIso)) {
+      toast.error("Informe a data do lançamento como dd/mm/aaaa")
       return
     }
 
     await criarLancamento.mutateAsync({
       ...newLancamento,
       valor,
+      data: dataIso,
     })
 
     setNewLancamento({
@@ -106,6 +180,42 @@ export default function FinanceiroPage() {
     setOpenDialog(false)
   }
 
+  const handleCriarCustoFixo = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const v = parseMoedaBRL(novoCusto.valor)
+    if (!novoCusto.descricao.trim() || Number.isNaN(v) || v <= 0) {
+      toast.error("Preencha descrição e valor mensal válidos")
+      return
+    }
+    await criarCustoFixo.mutateAsync({ descricao: novoCusto.descricao.trim(), valor_mensal: v })
+    setNovoCusto({ descricao: "", valor: "" })
+    setOpenCustoFixo(false)
+  }
+
+  const abrirEdicaoCusto = (c: CustoFixo) => {
+    setEditCusto(c)
+    setEditForm({
+      descricao: c.descricao,
+      valor: maskMoedaBRL(String(Math.round(c.valor_mensal * 100))),
+      ativo: c.ativo,
+    })
+  }
+
+  const handleSalvarEdicaoCusto = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editCusto) return
+    const v = parseMoedaBRL(editForm.valor)
+    if (!editForm.descricao.trim() || Number.isNaN(v) || v <= 0) {
+      toast.error("Preencha descrição e valor válidos")
+      return
+    }
+    await atualizarCustoFixo.mutateAsync({
+      id: editCusto.id,
+      data: { descricao: editForm.descricao.trim(), valor_mensal: v, ativo: editForm.ativo },
+    })
+    setEditCusto(null)
+  }
+
   const handleFilterChange = (key: keyof FiltrosFinanceiro, value: string) => {
     setFiltros(prev => ({
       ...prev,
@@ -114,25 +224,71 @@ export default function FinanceiroPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-full min-w-0 space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Gestão Financeira</h1>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Gestão Financeira</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Controle o fluxo de caixa e acompanhe os lançamentos financeiros da clínica
+            Controle o fluxo de caixa, custos fixos mensais e lançamentos da clínica
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Button variant="outline" className="inline-flex items-center gap-2">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button variant="outline" className="inline-flex w-full shrink-0 items-center justify-center gap-2 sm:w-auto">
             <Download className="h-4 w-4" />
             Exportar Relatório
           </Button>
 
+          {podeVerTudo && (
+            <Dialog open={openCustoFixo} onOpenChange={setOpenCustoFixo}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="inline-flex w-full shrink-0 items-center justify-center gap-2 sm:w-auto">
+                  <Building2 className="h-4 w-4" />
+                  Novo custo fixo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogTitle>Custo fixo mensal</DialogTitle>
+                <DialogDescription>Ex.: aluguel, internet, software, contador.</DialogDescription>
+                <form onSubmit={handleCriarCustoFixo} className="mt-4 space-y-4">
+                  <div>
+                    <Label htmlFor="cf-desc">Descrição</Label>
+                    <Input
+                      id="cf-desc"
+                      value={novoCusto.descricao}
+                      onChange={(e) => setNovoCusto((p) => ({ ...p, descricao: e.target.value }))}
+                      placeholder="Aluguel da sala"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cf-val">Valor mensal (R$)</Label>
+                    <Input
+                      id="cf-val"
+                      inputMode="decimal"
+                      value={novoCusto.valor}
+                      onChange={(e) => setNovoCusto((p) => ({ ...p, valor: maskMoedaBRL(e.target.value) }))}
+                      placeholder="0,00"
+                      required
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button type="button" variant="secondary" onClick={() => setOpenCustoFixo(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={criarCustoFixo.isPending}>
+                      {criarCustoFixo.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger asChild>
-              <Button className="inline-flex items-center gap-2">
+              <Button className="inline-flex w-full shrink-0 items-center justify-center gap-2 sm:w-auto">
                 <Plus className="h-4 w-4" />
                 Novo Lançamento
               </Button>
@@ -195,11 +351,14 @@ export default function FinanceiroPage() {
                   <Label htmlFor="valor">Valor (R$)</Label>
                   <Input
                     id="valor"
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    inputMode="decimal"
                     value={newLancamento.valor}
-                    onChange={(e) => setNewLancamento(prev => ({ ...prev, valor: e.target.value }))}
+                    onChange={(e) =>
+                      setNewLancamento((prev) => ({
+                        ...prev,
+                        valor: maskMoedaBRL(e.target.value),
+                      }))
+                    }
                     placeholder="0,00"
                     required
                   />
@@ -209,9 +368,15 @@ export default function FinanceiroPage() {
                   <Label htmlFor="data">Data</Label>
                   <Input
                     id="data"
-                    type="date"
-                    value={newLancamento.data}
-                    onChange={(e) => setNewLancamento(prev => ({ ...prev, data: e.target.value }))}
+                    inputMode="numeric"
+                    placeholder="dd/mm/aaaa"
+                    value={dataLancBR}
+                    onChange={(e) => {
+                      const br = maskDataBR(e.target.value)
+                      setDataLancBR(br)
+                      const iso = dataBRToISO(br)
+                      if (iso) setNewLancamento((prev) => ({ ...prev, data: iso }))
+                    }}
                     required
                   />
                 </div>
@@ -231,29 +396,27 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Resumo Financeiro */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div
+        className={`grid gap-4 ${podeVerTudo ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-3"}`}
+      >
         {loadingResumo ? (
-          <>
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-          </>
+          Array.from({ length: podeVerTudo ? 4 : 3 }).map((_, i) => <MetricCardSkeleton key={i} />)
         ) : (
           <>
-            <Card className="border-green-100 bg-green-50/80">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-green-100 p-2">
+            <Card className="min-w-0 border-green-100 bg-green-50/80">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="shrink-0 rounded-full bg-green-100 p-2">
                     <TrendingUp className="h-5 w-5 text-green-600" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm text-slate-500">Total de Entradas</p>
-                    <p className="text-2xl font-semibold text-green-700">
-                      {canViewFullFinancials(usuario?.tipo_usuario || '') ? (
+                    <p className="truncate text-xl font-semibold text-green-700 sm:text-2xl">
+                      {podeVerTudo ? (
                         formatCurrency(totaisVisiveis?.totalEntradas || 0)
                       ) : (
                         <span className="flex items-center gap-1">
-                          <EyeOff className="h-4 w-4" />
+                          <EyeOff className="h-4 w-4 shrink-0" />
                           Restrito
                         </span>
                       )}
@@ -263,20 +426,22 @@ export default function FinanceiroPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-red-100 bg-red-50/80">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-red-100 p-2">
+            <Card className="min-w-0 border-red-100 bg-red-50/80">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="shrink-0 rounded-full bg-red-100 p-2">
                     <TrendingDown className="h-5 w-5 text-red-600" />
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Total de Saídas</p>
-                    <p className="text-2xl font-semibold text-red-700">
-                      {canViewFullFinancials(usuario?.tipo_usuario || '') ? (
-                        formatCurrency(totaisVisiveis?.totalSaidas || 0)
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-500">
+                      {podeVerTudo ? "Saídas (lançamentos)" : "Total de Saídas"}
+                    </p>
+                    <p className="truncate text-xl font-semibold text-red-700 sm:text-2xl">
+                      {podeVerTudo ? (
+                        formatCurrency(totaisVisiveis?.totalSaidasLancamentos ?? 0)
                       ) : (
                         <span className="flex items-center gap-1">
-                          <EyeOff className="h-4 w-4" />
+                          <EyeOff className="h-4 w-4 shrink-0" />
                           Restrito
                         </span>
                       )}
@@ -286,26 +451,56 @@ export default function FinanceiroPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-blue-100 bg-blue-50/80">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-blue-100 p-2">
+            {podeVerTudo && (
+              <Card className="min-w-0 border-amber-100 bg-amber-50/80">
+                <CardContent className="p-5 sm:p-6">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="shrink-0 rounded-full bg-amber-100 p-2">
+                      <Building2 className="h-5 w-5 text-amber-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-500">Custos fixos (período)</p>
+                      <p className="truncate text-xl font-semibold text-amber-900 sm:text-2xl">
+                        {formatCurrency(totaisVisiveis?.custosFixosNoPeriodo ?? 0)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Base mensal {formatCurrency(totaisVisiveis?.custosFixosMensal ?? 0)} ×{" "}
+                        {totaisVisiveis?.mesesNoPeriodo ?? 1} mes(es)
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="min-w-0 border-blue-100 bg-blue-50/80">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="shrink-0 rounded-full bg-blue-100 p-2">
                     <DollarSign className="h-5 w-5 text-blue-600" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm text-slate-500">Saldo Líquido</p>
-                    <p className={`text-2xl font-semibold ${
-                      (totaisVisiveis?.saldoLiquido || 0) >= 0 ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {canViewFullFinancials(usuario?.tipo_usuario || '') ? (
+                    <p
+                      className={`truncate text-xl font-semibold sm:text-2xl ${
+                        (totaisVisiveis?.saldoLiquido || 0) >= 0 ? "text-green-700" : "text-red-700"
+                      }`}
+                    >
+                      {podeVerTudo ? (
                         formatCurrency(totaisVisiveis?.saldoLiquido || 0)
                       ) : (
                         <span className="flex items-center gap-1">
-                          <EyeOff className="h-4 w-4" />
+                          <EyeOff className="h-4 w-4 shrink-0" />
                           Restrito
                         </span>
                       )}
                     </p>
+                    {podeVerTudo && (
+                      <p className="mt-1 text-xs text-slate-600">
+                        Inclui lançamentos + custos fixos no período (total saídas{" "}
+                        {formatCurrency(totaisVisiveis?.totalSaidas || 0)})
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -323,36 +518,61 @@ export default function FinanceiroPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
+          <div className="grid w-full min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="min-w-0">
               <Label htmlFor="dataInicio">Data Início</Label>
               <Input
                 id="dataInicio"
-                type="date"
-                value={filtros.dataInicio || ''}
-                onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
+                inputMode="numeric"
+                placeholder="dd/mm/aaaa"
+                value={filtroInicioBR}
+                onChange={(e) => {
+                  const br = maskDataBR(e.target.value)
+                  setFiltroInicioBR(br)
+                  if (digitsOnly(br).length === 0) {
+                    handleFilterChange("dataInicio", "")
+                    return
+                  }
+                  const iso = dataBRToISO(br)
+                  if (iso) handleFilterChange("dataInicio", iso)
+                }}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <Label htmlFor="dataFim">Data Fim</Label>
               <Input
                 id="dataFim"
-                type="date"
-                value={filtros.dataFim || ''}
-                onChange={(e) => handleFilterChange('dataFim', e.target.value)}
+                inputMode="numeric"
+                placeholder="dd/mm/aaaa"
+                value={filtroFimBR}
+                onChange={(e) => {
+                  const br = maskDataBR(e.target.value)
+                  setFiltroFimBR(br)
+                  if (digitsOnly(br).length === 0) {
+                    handleFilterChange("dataFim", "")
+                    return
+                  }
+                  const iso = dataBRToISO(br)
+                  if (iso) handleFilterChange("dataFim", iso)
+                }}
               />
             </div>
-            <div>
+            <div className="min-w-0 sm:col-span-2 lg:col-span-1">
               <Label htmlFor="categoria">Categoria</Label>
               <Select
-                value={filtros.categoria || ''}
-                onValueChange={(value) => handleFilterChange('categoria', value)}
+                value={filtros.categoria ?? "__all__"}
+                onValueChange={(value) =>
+                  setFiltros((prev) => ({
+                    ...prev,
+                    categoria: value === "__all__" ? undefined : (value as "PARTICULAR" | "CONVENIO"),
+                  }))
+                }
               >
-                <SelectTrigger>
+                <SelectTrigger id="categoria">
                   <SelectValue placeholder="Todas as categorias" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as categorias</SelectItem>
+                  <SelectItem value="__all__">Todas as categorias</SelectItem>
                   <SelectItem value="PARTICULAR">Particular</SelectItem>
                   <SelectItem value="CONVENIO">Convênio</SelectItem>
                 </SelectContent>
@@ -362,8 +582,59 @@ export default function FinanceiroPage() {
         </CardContent>
       </Card>
 
+      {podeVerTudo && (
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              <Building2 className="h-5 w-5 shrink-0" />
+              Custos fixos mensais
+            </CardTitle>
+            <p className="text-sm text-slate-600">
+              Valores recorrentes (aluguel, internet, etc.) entram automaticamente no resumo e no saldo do período
+              filtrado.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {loadingCustosFixos ? (
+              <MetricCardSkeleton />
+            ) : (custosFixos ?? []).length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhum custo fixo cadastrado. Use &quot;Novo custo fixo&quot;.</p>
+            ) : (
+              <div className="w-full min-w-0 overflow-x-auto rounded-md border border-slate-100">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead className="text-right">Valor mensal</TableHead>
+                      <TableHead>Ativo</TableHead>
+                      <TableHead className="text-right w-[100px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(custosFixos ?? []).map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="max-w-[200px] truncate font-medium">{c.descricao}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          {formatCurrency(c.valor_mensal)}
+                        </TableCell>
+                        <TableCell>{c.ativo ? "Sim" : "Não"}</TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="sm" onClick={() => abrirEdicaoCusto(c)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tabela de Lançamentos */}
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle>Fluxo de Caixa</CardTitle>
         </CardHeader>
@@ -386,18 +657,19 @@ export default function FinanceiroPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lancamentosFiltrados.map((lancamento: LancamentoFinanceiro) => (
+            <div className="w-full min-w-0 overflow-x-auto rounded-md border border-slate-100">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lancamentosFiltrados.map((lancamento: LancamentoFinanceiro) => (
                   <TableRow key={lancamento.id}>
                     <TableCell>
                       {format(parseISO(lancamento.data), "dd/MM/yyyy", { locale: ptBR })}
@@ -428,12 +700,63 @@ export default function FinanceiroPage() {
                       {formatCurrency(lancamento.valor)}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editCusto} onOpenChange={(o) => !o && setEditCusto(null)}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Editar custo fixo</DialogTitle>
+          <DialogDescription>Altere o valor mensal ou desative o item.</DialogDescription>
+          {editCusto && (
+            <form onSubmit={handleSalvarEdicaoCusto} className="mt-4 space-y-4">
+              <div>
+                <Label htmlFor="ed-desc">Descrição</Label>
+                <Input
+                  id="ed-desc"
+                  value={editForm.descricao}
+                  onChange={(e) => setEditForm((p) => ({ ...p, descricao: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="ed-val">Valor mensal (R$)</Label>
+                <Input
+                  id="ed-val"
+                  inputMode="decimal"
+                  value={editForm.valor}
+                  onChange={(e) => setEditForm((p) => ({ ...p, valor: maskMoedaBRL(e.target.value) }))}
+                  required
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="ed-ativo"
+                  className="h-4 w-4 rounded border-slate-300"
+                  checked={editForm.ativo}
+                  onChange={(e) => setEditForm((p) => ({ ...p, ativo: e.target.checked }))}
+                />
+                <Label htmlFor="ed-ativo" className="font-normal cursor-pointer">
+                  Custo ativo (entra no resumo)
+                </Label>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="secondary" onClick={() => setEditCusto(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={atualizarCustoFixo.isPending}>
+                  {atualizarCustoFixo.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
