@@ -1,4 +1,4 @@
-﻿import type { NextConfig } from "next/dist/server/config";
+﻿import type { NextConfig } from "./src/types/next";
 
 const nextConfig: NextConfig = {
   /* config options here */
