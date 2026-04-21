@@ -82,7 +82,7 @@ const emptyNovoProc = {
 }
 
 export default function AgendaPage() {
-  const { usuario, hasPermission } = useAuth()
+  const { usuario } = useAuth()
   const searchParams = useSearchParams()
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [selectedProfessional, setSelectedProfessional] = useState<string>("")
