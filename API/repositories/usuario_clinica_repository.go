@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"errors"
+
 	"github.com/ferrariwill/Clinicas/API/models"
 	"gorm.io/gorm"
 )
@@ -11,6 +13,8 @@ type UsuarioClinicaRepository interface {
 	Criar(uc *models.UsuarioClinica) error
 	AtualizarTipo(usuarioID, clinicaID, tipoUsuarioID uint) error
 	UsuarioTemAssociacaoAtiva(usuarioID, clinicaID uint) (bool, error)
+	// GarantirVinculoAtivo cria ou reativa vínculo usuário–clínica com o tipo informado.
+	GarantirVinculoAtivo(usuarioID, clinicaID, tipoUsuarioID uint) error
 }
 
 type usuarioClinicaRepository struct {
@@ -55,4 +59,24 @@ func (r *usuarioClinicaRepository) UsuarioTemAssociacaoAtiva(usuarioID, clinicaI
 		Where("usuario_id = ? AND clinica_id = ? AND ativo = ?", usuarioID, clinicaID, true).
 		Count(&n).Error
 	return n > 0, err
+}
+
+func (r *usuarioClinicaRepository) GarantirVinculoAtivo(usuarioID, clinicaID, tipoUsuarioID uint) error {
+	var uc models.UsuarioClinica
+	err := r.db.Where("usuario_id = ? AND clinica_id = ?", usuarioID, clinicaID).First(&uc).Error
+	if err == nil {
+		return r.db.Model(&uc).Updates(map[string]interface{}{
+			"tipo_usuario_id": tipoUsuarioID,
+			"ativo":           true,
+		}).Error
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return r.db.Create(&models.UsuarioClinica{
+			UsuarioID:     usuarioID,
+			ClinicaID:     clinicaID,
+			TipoUsuarioID: tipoUsuarioID,
+			Ativo:         true,
+		}).Error
+	}
+	return err
 }

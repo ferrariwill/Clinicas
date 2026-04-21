@@ -405,8 +405,10 @@ class ApiClient {
   }
 
   // Users endpoints
-  async getUsuarios() {
-    const response = await this.axiosInstance.get("/usuarios");
+  async getUsuarios(options?: { incluirInativos?: boolean }) {
+    const params =
+      options?.incluirInativos === true ? { ativos: "false" } : { ativos: "true" };
+    const response = await this.axiosInstance.get("/usuarios", { params });
     return response.data;
   }
 

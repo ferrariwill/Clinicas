@@ -179,6 +179,7 @@ export const useToggleGestaoPermissao = () => {
     },
     onSuccess: (_, p) => {
       qc.invalidateQueries({ queryKey: ["clinica-gestao-permissoes", p.tipoUsuarioId] })
+      qc.invalidateQueries({ queryKey: ["minhas-permissoes-rotas"] })
     },
     onError: (e: unknown) => {
       const err = e as { message?: string }

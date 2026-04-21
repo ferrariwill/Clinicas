@@ -5,7 +5,21 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { LogOut } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
-import { rotaPrefixLiberada, useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
+import { computeTelasLiberadas, useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
+
+function tituloCabecalho(pathname: string): string {
+  if (pathname === "/dashboard") return "Dashboard operacional"
+  if (pathname.startsWith("/agenda")) return "Agenda médica"
+  if (pathname.startsWith("/atendimentos")) return "Meus atendimentos"
+  if (pathname.startsWith("/pacientes")) return "Pacientes"
+  if (pathname.startsWith("/procedimentos")) return "Procedimentos"
+  if (pathname.startsWith("/convenios")) return "Convênios"
+  if (pathname.startsWith("/financeiro")) return "Gestão financeira"
+  if (pathname.startsWith("/equipe")) return "Equipe da clínica"
+  if (pathname.startsWith("/gestao")) return "Perfis e telas"
+  if (pathname === "/trocar-senha") return "Segurança da conta"
+  return "Clínicas"
+}
 
 export default function DashboardLayout({
   children,
@@ -13,58 +27,22 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { isAuthenticated, usuario, logout, hasPermission, userRole } = useAuth()
-  const { data: permRotas } = useMinhasPermissoesRotas()
-  const canGestaoPerfis = hasPermission(["DONO", "DONO_CLINICA", "ADM_GERAL"])
-  const canAtendimentos = hasPermission(["MEDICO", "DONO", "DONO_CLINICA", "SECRETARIA"])
+  const { isAuthenticated, usuario, logout, userRole } = useAuth()
+  const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
+  /** Só monta o menu após GET /auth/minhas-permissoes-rotas — evita itens incorretos (cache ou bypass errado). */
+  const permParaMenu = permissoesOk ? permRotas : undefined
 
-  const acessoTotalTelas = useMemo(() => {
-    if (permRotas?.acesso_total) return true
-    if (userRole === "DONO") return true
-    return false
-  }, [permRotas?.acesso_total, userRole])
-
-  const rotasApi = permRotas?.rotas ?? []
-
-  const podeDashboard = useMemo(() => {
-    if (acessoTotalTelas) return true
-    return rotasApi.some((r) => r === "/dashboard" || r.startsWith("/dashboard/"))
-  }, [acessoTotalTelas, rotasApi])
-
-  const podeAgenda = useMemo(
-    () => rotaPrefixLiberada(rotasApi, acessoTotalTelas, "/clinicas/agenda"),
-    [rotasApi, acessoTotalTelas]
-  )
-  const podePacientes = useMemo(
-    () => rotaPrefixLiberada(rotasApi, acessoTotalTelas, "/pacientes"),
-    [rotasApi, acessoTotalTelas]
-  )
-  const podeFinanceiro = useMemo(() => {
-    if (acessoTotalTelas) return true
-    return rotasApi.some(
-      (r) => r === "/financeiro/abrir" || r.startsWith("/clinicas/financeiro")
-    )
-  }, [acessoTotalTelas, rotasApi])
-  const podeEquipe = useMemo(() => {
-    if (acessoTotalTelas) return true
-    return (
-      rotaPrefixLiberada(rotasApi, false, "/usuarios") ||
-      rotasApi.some((r) => r.startsWith("/clinicas/usuarios"))
-    )
-  }, [acessoTotalTelas, rotasApi])
-  const podeProcedimentos = useMemo(
-    () => rotaPrefixLiberada(rotasApi, acessoTotalTelas, "/procedimentos"),
-    [rotasApi, acessoTotalTelas]
-  )
-  const podeConvenios = useMemo(
-    () => rotaPrefixLiberada(rotasApi, acessoTotalTelas, "/convenios"),
-    [rotasApi, acessoTotalTelas]
-  )
-  const podeGestaoTelas = useMemo(() => {
-    if (!canGestaoPerfis) return false
-    if (acessoTotalTelas) return true
-    return rotaPrefixLiberada(rotasApi, false, "/clinicas/gestao")
-  }, [canGestaoPerfis, acessoTotalTelas, rotasApi])
+  const {
+    podeDashboard,
+    podeAgenda,
+    podeAtendimentos,
+    podePacientes,
+    podeFinanceiro,
+    podeEquipe,
+    podeProcedimentos,
+    podeConvenios,
+    podeGestaoTelas,
+  } = useMemo(() => computeTelasLiberadas(permParaMenu, userRole), [permParaMenu, userRole])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -115,11 +93,11 @@ export default function DashboardLayout({
                 Agenda Médica
               </Link>
             )}
-            {canAtendimentos && (
-              <Link href="/atendimentos" className={`block rounded-2xl px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/atendimentos") ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-100"}`}>
-                Meus atendimentos
-              </Link>
-            )}
+                {podeAtendimentos && (
+                  <Link href="/atendimentos" className={`block rounded-2xl px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/atendimentos") ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-100"}`}>
+                    Meus atendimentos
+                  </Link>
+                )}
             {podePacientes && (
               <Link href="/pacientes" className={`block rounded-2xl px-4 py-3 text-sm font-medium transition ${pathname.startsWith("/pacientes") ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-100"}`}>
                 Pacientes
@@ -172,7 +150,7 @@ export default function DashboardLayout({
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <header className="bg-white shadow-sm border-b border-gray-200">
             <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-3 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 lg:px-8">
-              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl shrink-0">Dashboard</h1>
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl shrink-0">{tituloCabecalho(pathname)}</h1>
               <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
                 <span className="hidden min-w-0 truncate text-sm text-slate-600 sm:inline max-w-[min(200px,40vw)]" title={usuario?.email}>
                   {usuario?.nome}
@@ -208,7 +186,7 @@ export default function DashboardLayout({
                     Agenda
                   </Link>
                 )}
-                {canAtendimentos && (
+                {podeAtendimentos && (
                   <Link href="/atendimentos" className={linkClass(pathname.startsWith("/atendimentos"))}>
                     Atendimentos
                   </Link>

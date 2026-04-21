@@ -30,11 +30,11 @@ export const useTiposUsuarioClinica = () =>
     },
   })
 
-export const useUsuariosClinica = () =>
+export const useUsuariosClinica = (incluirInativos = false) =>
   useQuery<UsuarioResponse[]>({
-    queryKey: ["clinica-usuarios"],
+    queryKey: ["clinica-usuarios", incluirInativos],
     queryFn: async () => {
-      const response = await apiClient.getUsuarios()
+      const response = await apiClient.getUsuarios({ incluirInativos })
       const rawList = (Array.isArray(response) ? response : (response.usuarios ?? [])) as Record<string, unknown>[]
       return rawList.map(mapUsuarioProfissionalFromAPI)
     },

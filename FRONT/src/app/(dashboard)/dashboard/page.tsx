@@ -1,9 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
-import { useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
+import {
+  computeTelasLiberadas,
+  useMinhasPermissoesRotas,
+} from "@/hooks/use-minhas-permissoes-rotas"
 import { useDashboardMetrics, useResumoFinanceiroMes } from "@/hooks/use-dashboard"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,20 +35,20 @@ import {
 export default function DashboardOperacionalPage() {
   const router = useRouter()
   const { usuario, clinicaId, userRole } = useAuth()
-  const isMedico = userRole === "MEDICO"
-  const { data: permRotas, isFetched } = useMinhasPermissoesRotas()
+  const isMedico = (userRole ?? "").toUpperCase() === "MEDICO"
+  const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
   const [selectedClinicaId, setSelectedClinicaId] = useState<string | undefined>(clinicaId ?? undefined)
+  const { podeDashboard } = useMemo(
+    () => computeTelasLiberadas(permissoesOk ? permRotas : undefined, userRole),
+    [permRotas, userRole, permissoesOk]
+  )
 
   useEffect(() => {
-    if (!isFetched) return
-    const acessoTotal = Boolean(permRotas?.acesso_total) || userRole === "DONO"
-    const rotas = permRotas?.rotas ?? []
-    const podeDashboard =
-      acessoTotal || rotas.some((r) => r === "/dashboard" || r.startsWith("/dashboard/"))
+    if (!permissoesOk) return
     if (!podeDashboard) {
       router.replace("/agenda")
     }
-  }, [isFetched, permRotas, userRole, router])
+  }, [permissoesOk, podeDashboard, router])
 
   useEffect(() => {
     if (!selectedClinicaId && clinicaId) {
@@ -99,10 +102,7 @@ export default function DashboardOperacionalPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Dashboard Operacional
-          </h1>
-          <p className="text-gray-600 text-sm mt-1">
+          <p className="text-gray-600 text-sm">
             Bem-vindo, {usuario?.nome}!
           </p>
         </div>

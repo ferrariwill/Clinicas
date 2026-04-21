@@ -72,8 +72,7 @@ export default function ConveniosPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Convênios</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="text-sm text-slate-600">
             Cadastre planos e convênios da clínica. Eles podem ser vinculados a procedimentos na API.
           </p>
         </div>

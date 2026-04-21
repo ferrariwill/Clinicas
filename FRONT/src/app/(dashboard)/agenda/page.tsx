@@ -286,8 +286,7 @@ export default function AgendaPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Agenda Médica</h1>
-          <p className="mt-2 text-sm text-slate-600 max-w-2xl">
+          <p className="text-sm text-slate-600 max-w-2xl">
             Visualize e gerencie os agendamentos do dia. Cadastre paciente e procedimento aqui mesmo quando precisar.
           </p>
         </div>

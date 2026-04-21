@@ -2,12 +2,24 @@ package services
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/models"
 	"github.com/ferrariwill/Clinicas/API/repositories"
 	"gorm.io/gorm"
 )
+
+func rotaModuloAgenda(rota string) bool {
+	return rota == "/clinicas/agenda" || strings.HasPrefix(rota, "/clinicas/agenda/")
+}
+
+func rotaModuloEquipe(rota string) bool {
+	if rota == "/usuarios" || rota == "/clinicas/tipos-usuario" || rota == "/clinicas/usuarios" {
+		return true
+	}
+	return strings.HasPrefix(rota, "/usuarios/")
+}
 
 type PermissaoTelaService interface {
 	AssociarTela(tipoUsuarioID, telaID uint) error
@@ -61,12 +73,51 @@ func (s *permissaoTelaService) VerificarPermissaoTipoUsuario(tipoUsuarioID uint,
 	}
 
 	tipoUsuario, err := s.tipoUsuarioService.BuscarPorID(tipoUsuarioID)
-	if err == nil && tipoUsuario.Nome == "Administrador" {
+	// Dono / admin global: bypass por papel (não usar nome "Administrador" — perfil dono da clínica usa esse nome e não pode liberar tudo para perfis de equipe).
+	if err == nil && (tipoUsuario.Papel == rbac.PapelDono || tipoUsuario.Papel == rbac.PapelADMGeral) {
 		return true, nil
 	}
-	// Dono da clínica: acesso total às rotas da API (perfis de equipe usam permissões granulares)
-	if err == nil && tipoUsuario.Papel == rbac.PapelDono {
-		return true, nil
+
+	// "Meus atendimentos": a tela /clinicas/atendimentos libera todas as rotas /clinicas/agenda* (mesma API).
+	// Permissões granulares de agenda continuam exigidas rota a rota quando não houver /clinicas/atendimentos.
+	if rotaModuloAgenda(rota) {
+		okM, errM := s.permitidoEmRotaCatalogo(tipoUsuarioID, "/clinicas/atendimentos")
+		if errM != nil {
+			return false, errM
+		}
+		if okM {
+			return true, nil
+		}
+	}
+
+	// Equipe: rota simbólica /clinicas/equipe cobre /usuarios*, /clinicas/tipos-usuario e POST /clinicas/usuarios.
+	if rotaModuloEquipe(rota) {
+		okE, errE := s.permitidoEmRotaCatalogo(tipoUsuarioID, "/clinicas/equipe")
+		if errE != nil {
+			return false, errE
+		}
+		if okE {
+			return true, nil
+		}
+	}
+
+	// Listagem global de usuários da clínica (GET /usuarios): mesmo módulo que "criar usuário na clínica" (POST /clinicas/usuarios).
+	if rota == "/usuarios" {
+		ok, errU := s.permitidoEmRotaCatalogo(tipoUsuarioID, "/usuarios")
+		if errU != nil {
+			return false, errU
+		}
+		if ok {
+			return true, nil
+		}
+		ok2, err2 := s.permitidoEmRotaCatalogo(tipoUsuarioID, "/clinicas/usuarios")
+		if err2 != nil {
+			return false, err2
+		}
+		if ok2 {
+			return true, nil
+		}
+		return false, nil
 	}
 
 	tela, errTela := s.telaService.BuscarTelaPorRota(rota)
@@ -81,6 +132,17 @@ func (s *permissaoTelaService) VerificarPermissaoTipoUsuario(tipoUsuarioID uint,
 	return s.repo.VerificarPermissao(tipoUsuarioID, tela.ID)
 }
 
+func (s *permissaoTelaService) permitidoEmRotaCatalogo(tipoUsuarioID uint, rota string) (bool, error) {
+	t, err := s.telaService.BuscarTelaPorRota(rota)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return s.repo.VerificarPermissao(tipoUsuarioID, t.ID)
+}
+
 func (s *permissaoTelaService) ListarRotasPermitidas(tipoUsuarioID uint) (rotas []string, acessoTotal bool, err error) {
 	if tipoUsuarioID == 1 {
 		return nil, true, nil
@@ -89,7 +151,7 @@ func (s *permissaoTelaService) ListarRotasPermitidas(tipoUsuarioID uint) (rotas 
 	if err != nil {
 		return nil, false, err
 	}
-	if tipoUsuario.Nome == "Administrador" || tipoUsuario.Papel == rbac.PapelDono {
+	if tipoUsuario.Papel == rbac.PapelDono || tipoUsuario.Papel == rbac.PapelADMGeral {
 		return nil, true, nil
 	}
 	perms, err := s.repo.ListarPorTipoUsuario(tipoUsuarioID)
@@ -106,6 +168,12 @@ func (s *permissaoTelaService) ListarRotasPermitidas(tipoUsuarioID uint) (rotas 
 		}
 		seen[p.Tela.Rota] = struct{}{}
 		rotas = append(rotas, p.Tela.Rota)
+	}
+	if _, ok := seen["/clinicas/usuarios"]; ok {
+		if _, has := seen["/usuarios"]; !has {
+			seen["/usuarios"] = struct{}{}
+			rotas = append(rotas, "/usuarios")
+		}
 	}
 	return rotas, false, nil
 }

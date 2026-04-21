@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/auth-store";
 import { apiClient } from "@/services/api-client";
 import type { UsuarioInfo } from "@/types/api";
@@ -21,6 +22,7 @@ function mapUsuarioInfoFromAuthPayload(
 }
 
 export const useAuth = () => {
+  const qc = useQueryClient();
   const {
     usuario,
     token,
@@ -52,6 +54,7 @@ export const useAuth = () => {
       )
       const usuario = mapUsuarioInfoFromAuthPayload(raw, obrigar)
       setUsuario(usuario, response.token)
+      void qc.invalidateQueries({ queryKey: ["minhas-permissoes-rotas"] })
       return { success: true, data: { ...response, usuario } }
     } catch (error: unknown) {
       const err = error as { message?: string }
@@ -85,6 +88,7 @@ export const useAuth = () => {
       )
       const next = mapUsuarioInfoFromAuthPayload(raw, obrigar)
       setUsuario(next, response.token)
+      void qc.invalidateQueries({ queryKey: ["minhas-permissoes-rotas"] })
       toast.success("Clínica alterada com sucesso")
       return { success: true as const }
     } catch (error: unknown) {

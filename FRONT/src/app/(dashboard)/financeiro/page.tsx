@@ -1,9 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/hooks/use-auth"
+import {
+  computeTelasLiberadas,
+  useMinhasPermissoesRotas,
+} from "@/hooks/use-minhas-permissoes-rotas"
 import {
   useLancamentosFinanceiros,
   useResumoFinanceiro,
@@ -66,7 +71,19 @@ const canViewLancamento = (
 }
 
 export default function FinanceiroPage() {
+  const router = useRouter()
   const { usuario, userRole } = useAuth()
+  const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
+  const { podeFinanceiro } = useMemo(
+    () => computeTelasLiberadas(permissoesOk ? permRotas : undefined, userRole),
+    [permRotas, userRole, permissoesOk]
+  )
+
+  useEffect(() => {
+    if (!permissoesOk) return
+    if (!podeFinanceiro) router.replace("/agenda")
+  }, [permissoesOk, podeFinanceiro, router])
+
   const [openDialog, setOpenDialog] = useState(false)
   const [openCustoFixo, setOpenCustoFixo] = useState(false)
   const [editCusto, setEditCusto] = useState<CustoFixo | null>(null)
@@ -223,13 +240,28 @@ export default function FinanceiroPage() {
     }))
   }
 
+  if (!permissoesOk) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-900">
+        <p className="font-medium">Carregando permissões…</p>
+      </div>
+    )
+  }
+  if (!podeFinanceiro) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-900">
+        <p className="font-medium">Sem acesso a esta área</p>
+        <p className="mt-2 text-amber-800">Redirecionando…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto w-full max-w-full min-w-0 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Gestão Financeira</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="text-sm text-slate-600">
             Controle o fluxo de caixa, custos fixos mensais e lançamentos da clínica
           </p>
         </div>

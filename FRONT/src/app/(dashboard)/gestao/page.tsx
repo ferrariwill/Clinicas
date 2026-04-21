@@ -144,8 +144,7 @@ export default function GestaoPerfisPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Perfis e telas</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="text-sm text-slate-600">
             Crie tipos de perfil na clínica e defina quais telas cada um acessa. Usuários da equipe continuam em{" "}
             <span className="font-medium text-slate-800">Equipe</span>.
           </p>

@@ -64,6 +64,89 @@ func RunMigrations(db *gorm.DB) {
 	ensurePermissoesPadraoMedicoSecretaria(db)
 	ensureConvenioPermissaoSecretaria(db)
 	ensureCustosFixosPermissoes(db)
+	ensureRotulosTelasMenu(db)
+	ensureTelaEquipeParaPerfisComModuloEquipe(db)
+	ensureTelaAtendimentosParaMedicosComAgenda(db)
+}
+
+// ensureRotulosTelasMenu atualiza nomes/descrições em bases já seedadas (seed só insere se rota não existir).
+func ensureRotulosTelasMenu(db *gorm.DB) {
+	updates := []struct {
+		rota  string
+		nome  string
+		desc  string
+	}{
+		{"/convenios", "Convênios (menu)", "Planos, convênios e vínculos com procedimentos — API /convenios"},
+	}
+	for _, u := range updates {
+		if err := db.Model(&models.Tela{}).Where("rota = ?", u.rota).Updates(map[string]interface{}{
+			"nome": u.nome, "descricao": u.desc,
+		}).Error; err != nil {
+			log.Printf("ensureRotulosTelasMenu %s: %v", u.rota, err)
+		}
+	}
+}
+
+// ensureTelaEquipeParaPerfisComModuloEquipe concede a tela /clinicas/equipe a tipos que já tinham alguma permissão do módulo equipe.
+func ensureTelaEquipeParaPerfisComModuloEquipe(db *gorm.DB) {
+	equipeTid := telaIDByRota(db, "/clinicas/equipe")
+	if equipeTid == 0 {
+		return
+	}
+	rotasLegado := []string{
+		"/usuarios", "/usuarios/:id", "/usuarios/:id/reativar", "/usuarios/:id/horarios",
+		"/clinicas/tipos-usuario", "/clinicas/usuarios",
+	}
+	var tipoIDs []uint
+	for _, r := range rotasLegado {
+		tid := telaIDByRota(db, r)
+		if tid == 0 {
+			continue
+		}
+		var ids []uint
+		if err := db.Model(&models.PermissaoTela{}).Where("tela_id = ?", tid).Distinct("tipo_usuario_id").Pluck("tipo_usuario_id", &ids); err != nil {
+			continue
+		}
+		tipoIDs = append(tipoIDs, ids...)
+	}
+	seen := make(map[uint]struct{})
+	for _, id := range tipoIDs {
+		if id == 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		grantPermIfMissing(db, id, equipeTid)
+	}
+}
+
+// ensureTelaAtendimentosParaMedicosComAgenda concede /clinicas/atendimentos apenas a perfis com papel Médico que já tenham agenda.
+func ensureTelaAtendimentosParaMedicosComAgenda(db *gorm.DB) {
+	atendTid := telaIDByRota(db, "/clinicas/atendimentos")
+	agendaTid := telaIDByRota(db, "/clinicas/agenda")
+	if atendTid == 0 || agendaTid == 0 {
+		return
+	}
+	var tipoIDs []uint
+	if err := db.Model(&models.PermissaoTela{}).Where("tela_id = ?", agendaTid).Distinct("tipo_usuario_id").Pluck("tipo_usuario_id", &tipoIDs); err != nil {
+		log.Printf("ensureTelaAtendimentosParaMedicosComAgenda: %v", err)
+		return
+	}
+	for _, typeID := range tipoIDs {
+		if typeID == 0 {
+			continue
+		}
+		var tu models.TipoUsuario
+		if err := db.First(&tu, typeID).Error; err != nil {
+			continue
+		}
+		if tu.Papel != rbac.PapelMedico {
+			continue
+		}
+		grantPermIfMissing(db, typeID, atendTid)
+	}
 }
 
 // syncDocumentoClinicaLegado preenche clinicas.documento a partir do cnpj em bases antigas.
@@ -275,17 +358,19 @@ func seedCatalogoTelas(db *gorm.DB) {
 		{Nome: "Paciente por CPF", Rota: "/pacientes/:cpf", Descricao: "Busca por CPF", Ativo: true},
 		{Nome: "Paciente por ID", Rota: "/pacientes/:id", Descricao: "Atualização / desativação", Ativo: true},
 		{Nome: "Reativar paciente", Rota: "/pacientes/:id/reativar", Descricao: "Reativa cadastro", Ativo: true},
+		{Nome: "Equipe da clínica (menu)", Rota: "/clinicas/equipe", Descricao: "Usuários, horários e tipos (/usuarios, /clinicas/tipos-usuario, /clinicas/usuarios)", Ativo: true},
 		{Nome: "Usuários da clínica", Rota: "/usuarios", Descricao: "Lista e cadastro global", Ativo: true},
 		{Nome: "Usuário por ID", Rota: "/usuarios/:id", Descricao: "Detalhe usuário", Ativo: true},
 		{Nome: "Reativar usuário", Rota: "/usuarios/:id/reativar", Descricao: "Reativa cadastro", Ativo: true},
 		{Nome: "Horários do usuário", Rota: "/usuarios/:id/horarios", Descricao: "Grade de atendimento", Ativo: true},
+		{Nome: "Meus atendimentos (menu)", Rota: "/clinicas/atendimentos", Descricao: "Fluxo do dia e status na agenda (libera as rotas /clinicas/agenda na API)", Ativo: true},
 		{Nome: "Agenda (lista/criar)", Rota: "/clinicas/agenda", Descricao: "Agendamentos da clínica", Ativo: true},
 		{Nome: "Status do agendamento", Rota: "/clinicas/agenda/:id/status", Descricao: "Confirmar / falta", Ativo: true},
 		{Nome: "Horários disponíveis", Rota: "/clinicas/agenda/horarios-disponiveis", Descricao: "Slots livres", Ativo: true},
 		{Nome: "Prontuários", Rota: "/clinicas/prontuarios", Descricao: "Listar e registrar", Ativo: true},
 		{Nome: "Prontuário por ID", Rota: "/clinicas/prontuarios/:id", Descricao: "Atualizar registro", Ativo: true},
 		{Nome: "Procedimentos", Rota: "/procedimentos", Descricao: "Catálogo de procedimentos", Ativo: true},
-		{Nome: "Convênios", Rota: "/convenios", Descricao: "Convênios e vínculos", Ativo: true},
+		{Nome: "Convênios (menu)", Rota: "/convenios", Descricao: "Planos, convênios e vínculos com procedimentos — mesma rota da API /convenios", Ativo: true},
 		{Nome: "Financeiro (abrir)", Rota: "/financeiro/abrir", Descricao: "Abertura do módulo financeiro", Ativo: true},
 		{Nome: "Lançamentos financeiros", Rota: "/clinicas/financeiro", Descricao: "Lista e novo lançamento", Ativo: true},
 		{Nome: "Resumo financeiro", Rota: "/clinicas/financeiro/resumo", Descricao: "Totais do período", Ativo: true},
@@ -334,19 +419,21 @@ func telaIDByRota(db *gorm.DB, rota string) uint {
 
 // ensurePermissoesPadraoMedicoSecretaria concede telas básicas quando o perfil ainda não tem nenhuma permissão.
 func ensurePermissoesPadraoMedicoSecretaria(db *gorm.DB) {
-	rotasMedico := []string{
+	rotasMedicoCore := []string{
 		"/dashboard", "/dashboard/agendamentos-hoje", "/dashboard/estatisticas", "/dashboard/metricas-operacionais",
 		"/pacientes", "/pacientes/:cpf", "/pacientes/:id",
 		"/clinicas/agenda", "/clinicas/agenda/:id/status", "/clinicas/agenda/horarios-disponiveis",
 		"/clinicas/prontuarios", "/clinicas/prontuarios/:id",
 		"/procedimentos",
 	}
+	rotasMedico := append(append([]string{}, rotasMedicoCore...), "/clinicas/atendimentos")
 	rotasSecretaria := append([]string{
+		"/clinicas/equipe",
 		"/usuarios", "/usuarios/:id", "/usuarios/:id/horarios",
 		"/clinicas/tipos-usuario", "/clinicas/usuarios",
 		"/clinicas/financeiro", "/clinicas/financeiro/resumo", "/financeiro/abrir",
 		"/convenios",
-	}, rotasMedico...)
+	}, rotasMedicoCore...)
 
 	var tipos []models.TipoUsuario
 	if err := db.Where("nome IN ?", []string{"Médico", "Secretária"}).Find(&tipos).Error; err != nil {

@@ -243,19 +243,18 @@ func (s *authService) GerarTokenRedifinicao(email string) error {
 	if base == "" {
 		base = "http://localhost:3000"
 	}
-	subject := "RECUPERAÇÃO DE SENHA — SISTEMA CLÍNICAS"
-	body := strings.ToUpper(fmt.Sprintf(`
-OLÁ, %s.
+	subject := "Recuperação de senha — Sistema Clínicas"
+	body := fmt.Sprintf(`Olá, %s.
 
-FOI SOLICITADA UMA NOVA SENHA PARA SUA CONTA.
+Foi solicitada uma nova senha para sua conta.
 
-E-MAIL: %s
-SENHA PROVISÓRIA: %s
+E-mail: %s
+Senha provisória: %s
 
-ACESSE O SISTEMA E FAÇA LOGIN. SERÁ OBRIGATÓRIO DEFINIR UMA NOVA SENHA APÓS O ACESSO.
+Faça login no sistema. Será obrigatório definir uma nova senha após o acesso.
 
-LINK: %s/login
-`, usuario.Nome, usuario.Email, plain, strings.TrimRight(base, "/")))
+Link: %s/login
+`, usuario.Nome, usuario.Email, plain, strings.TrimRight(base, "/"))
 
 	if err := s.mailer.Send(usuario.Email, subject, strings.TrimSpace(body)); err != nil {
 		return fmt.Errorf("erro ao enviar e-mail: %w", err)

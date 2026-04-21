@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +12,7 @@ import (
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	"github.com/ferrariwill/Clinicas/API/repositories"
 	"github.com/ferrariwill/Clinicas/API/utils"
+	"gorm.io/gorm"
 )
 
 type UsuarioService interface {
@@ -39,11 +41,38 @@ func NovoUsuarioService(repo repositories.UsuarioRepository, ucRepo repositories
 }
 
 func (s *usuarioService) CriarUsuario(u *models.Usuario, clinicaId uint) error {
+	u.Email = utils.NormalizarEmail(u.Email)
 	u.ClinicaID = clinicaId
 	u.Ativo = true
 	u.ObrigarTrocaSenha = false
-	hash, _ := utils.HashSenha(u.Senha)
+	hash, err := utils.HashSenha(u.Senha)
+	if err != nil {
+		return err
+	}
 	u.Senha = hash
+
+	ex, errEx := s.repo.BuscarPorEmail(u.Email)
+	if errEx == nil && ex != nil && ex.ID > 0 {
+		if ex.Ativo {
+			return errors.New("já existe um usuário ativo cadastrado com este e-mail")
+		}
+		ex.Nome = strings.TrimSpace(u.Nome)
+		ex.Email = u.Email
+		ex.Senha = hash
+		ex.ClinicaID = clinicaId
+		ex.TipoUsuarioID = u.TipoUsuarioID
+		ex.Ativo = true
+		ex.ObrigarTrocaSenha = false
+		if err := s.repo.AtualizarUsuario(ex); err != nil {
+			return err
+		}
+		*u = *ex
+		return s.ucRepo.GarantirVinculoAtivo(ex.ID, clinicaId, u.TipoUsuarioID)
+	}
+	if errEx != nil && !errors.Is(errEx, gorm.ErrRecordNotFound) {
+		return errEx
+	}
+
 	if err := s.repo.CriarUsuario(u); err != nil {
 		return err
 	}
@@ -106,6 +135,11 @@ func (s *usuarioService) AtualizarTipoUsuarioNaClinica(usuarioID, clinicaID, tip
 }
 
 func (s *usuarioService) CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, clinicaID uint) (models.Usuario, bool, error) {
+	emailNorm := utils.NormalizarEmail(dto.Email)
+	if emailNorm == "" {
+		return models.Usuario{}, false, errors.New("e-mail inválido")
+	}
+
 	var plain string
 	var obrigar bool
 	if dto.Senha != nil && strings.TrimSpace(*dto.Senha) != "" {
@@ -121,9 +155,38 @@ func (s *usuarioService) CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, cli
 		return models.Usuario{}, false, err
 	}
 
+	existing, errEx := s.repo.BuscarPorEmail(emailNorm)
+	if errEx == nil && existing != nil && existing.ID > 0 {
+		if existing.Ativo {
+			return models.Usuario{}, false, errors.New("já existe um usuário ativo cadastrado com este e-mail")
+		}
+		existing.Nome = strings.TrimSpace(dto.Nome)
+		existing.Email = emailNorm
+		existing.Senha = senhaHash
+		existing.ClinicaID = clinicaID
+		existing.TipoUsuarioID = dto.TipoUsuarioID
+		existing.Ativo = true
+		existing.ObrigarTrocaSenha = obrigar
+		if err := s.repo.AtualizarUsuario(existing); err != nil {
+			return models.Usuario{}, false, err
+		}
+		if err := s.ucRepo.GarantirVinculoAtivo(existing.ID, clinicaID, dto.TipoUsuarioID); err != nil {
+			return models.Usuario{}, false, err
+		}
+		u := *existing
+		enviado, errMail := s.enviarEmailAcessoEquipe(emailNorm, dto.Nome, plain, obrigar)
+		if errMail != nil {
+			return u, false, errMail
+		}
+		return u, enviado, nil
+	}
+	if errEx != nil && !errors.Is(errEx, gorm.ErrRecordNotFound) {
+		return models.Usuario{}, false, errEx
+	}
+
 	usuario := models.Usuario{
-		Nome:              dto.Nome,
-		Email:             dto.Email,
+		Nome:              strings.TrimSpace(dto.Nome),
+		Email:             emailNorm,
 		Senha:             senhaHash,
 		ClinicaID:         clinicaID,
 		TipoUsuarioID:     dto.TipoUsuarioID,
@@ -144,38 +207,44 @@ func (s *usuarioService) CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, cli
 		return models.Usuario{}, false, err
 	}
 
-	emailEnviado := false
-	if obrigar {
-		if s.mailer == nil {
-			if os.Getenv("LOG_TEMP_PASSWORD") == "true" {
-				log.Printf("[CLÍNICAS] Novo usuário da equipe sem SMTP. E-mail=%s senha provisória=%s", dto.Email, plain)
-			} else {
-				log.Printf("[CLÍNICAS] Novo usuário %s criado sem envio de e-mail (configure SMTP ou LOG_TEMP_PASSWORD=true em dev).", dto.Email)
-			}
-			return usuario, false, nil
-		}
-		base := strings.TrimSpace(os.Getenv("APP_PUBLIC_URL"))
-		if base == "" {
-			base = "http://localhost:3000"
-		}
-		subject := "ACESSO À EQUIPE — SISTEMA CLÍNICAS"
-		body := strings.ToUpper(fmt.Sprintf(`
-OLÁ, %s.
-
-SUA CONTA NA EQUIPE DA CLÍNICA FOI CRIADA.
-
-E-MAIL DE ACESSO: %s
-SENHA PROVISÓRIA: %s
-
-NO PRIMEIRO ACESSO SERÁ OBRIGATÓRIO DEFINIR UMA NOVA SENHA.
-
-ACESSE: %s/login
-`, dto.Nome, dto.Email, plain, strings.TrimRight(base, "/")))
-		if err := s.mailer.Send(dto.Email, subject, strings.TrimSpace(body)); err != nil {
-			return usuario, false, fmt.Errorf("usuário criado mas falha ao enviar e-mail: %w", err)
-		}
-		emailEnviado = true
+	enviado, errMail := s.enviarEmailAcessoEquipe(emailNorm, dto.Nome, plain, obrigar)
+	if errMail != nil {
+		return usuario, false, errMail
 	}
+	return usuario, enviado, nil
+}
 
-	return usuario, emailEnviado, nil
+// enviarEmailAcessoEquipe envia credenciais com o mesmo casing cadastrado (e-mail normalizado em minúsculas; senha exata).
+func (s *usuarioService) enviarEmailAcessoEquipe(emailCadastro, nome, senhaPlana string, obrigar bool) (bool, error) {
+	if !obrigar {
+		return false, nil
+	}
+	if s.mailer == nil {
+		if os.Getenv("LOG_TEMP_PASSWORD") == "true" {
+			log.Printf("[CLÍNICAS] Novo usuário da equipe sem SMTP. E-mail=%s senha provisória=%s", emailCadastro, senhaPlana)
+		} else {
+			log.Printf("[CLÍNICAS] Novo usuário %s criado sem envio de e-mail (configure SMTP ou LOG_TEMP_PASSWORD=true em dev).", emailCadastro)
+		}
+		return false, nil
+	}
+	base := strings.TrimSpace(os.Getenv("APP_PUBLIC_URL"))
+	if base == "" {
+		base = "http://localhost:3000"
+	}
+	subject := "Acesso à equipe — Sistema Clínicas"
+	body := fmt.Sprintf(`Olá, %s.
+
+Sua conta na equipe da clínica foi criada (ou reativada).
+
+E-mail de acesso: %s
+Senha provisória: %s
+
+No primeiro acesso será obrigatório definir uma nova senha.
+
+Acesse: %s/login
+`, nome, emailCadastro, senhaPlana, strings.TrimRight(base, "/"))
+	if err := s.mailer.Send(emailCadastro, subject, strings.TrimSpace(body)); err != nil {
+		return false, fmt.Errorf("usuário salvo mas falha ao enviar e-mail: %w", err)
+	}
+	return true, nil
 }

@@ -39,33 +39,68 @@ func parseCORSOrigins() []string {
 	return out
 }
 
-func allowDevLocalhostOrigin(origin string, allowedOrigins []string) bool {
+// allCORSOriginsAreLoopback retorna true só quando TODAS as entradas configuradas são http(s) em
+// localhost/127.0.0.1/::1. Nesse caso liberamos qualquer porta no mesmo host (ex.: Docker com
+// FRONT_HOST_PORT=3001 e CORS_ORIGINS=http://localhost:3000). Se existir um domínio público na
+// lista, não relaxamos — evita abrir a API de produção para qualquer porta em localhost.
+func allCORSOriginsAreLoopback(origins []string) bool {
+	if len(origins) == 0 {
+		return false
+	}
+	for _, o := range origins {
+		o = strings.TrimSpace(o)
+		if o == "" {
+			continue
+		}
+		u, err := url.Parse(o)
+		if err != nil || u.Host == "" {
+			return false
+		}
+		sc := strings.ToLower(u.Scheme)
+		if sc != "http" && sc != "https" {
+			return false
+		}
+		h := strings.ToLower(u.Hostname())
+		if h != "localhost" && h != "127.0.0.1" && h != "::1" {
+			return false
+		}
+	}
+	return true
+}
+
+func corsIsOriginAllowed(origin string, allowed []string) bool {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
 		return false
 	}
-	for _, a := range allowedOrigins {
+	for _, a := range allowed {
 		if strings.EqualFold(strings.TrimSpace(a), origin) {
 			return true
 		}
 	}
+	if !allCORSOriginsAreLoopback(allowed) {
+		return false
+	}
 	u, err := url.Parse(origin)
-	if err != nil {
+	if err != nil || u.Host == "" {
+		return false
+	}
+	sc := strings.ToLower(u.Scheme)
+	if sc != "http" && sc != "https" {
 		return false
 	}
 	h := strings.ToLower(u.Hostname())
-	// Em dev, permitir localhost/loopback em qualquer porta para evitar 403 no preflight
-	// quando o Next escolhe porta livre automaticamente.
 	return h == "localhost" || h == "127.0.0.1" || h == "::1"
 }
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 	allowedOrigins := parseCORSOrigins()
+	// Só AllowOriginFunc: o gin-contrib/cors ainda avalia AllowOrigins antes da função; manter as
+	// duas gerava política duplicada e confusa. Com lista vazia aqui, a decisão fica só em corsIsOriginAllowed.
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     allowedOrigins,
 		AllowOriginFunc: func(origin string) bool {
-			return allowDevLocalhostOrigin(origin, allowedOrigins)
+			return corsIsOriginAllowed(origin, allowedOrigins)
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Clinic-ID"},

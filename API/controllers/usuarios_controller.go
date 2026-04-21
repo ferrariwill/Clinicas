@@ -164,7 +164,7 @@ func (uc *UsuarioController) Criar(c *gin.Context) {
 // @Tags Usuários
 // @Accept json
 // @Produce json
-// @Param ativos query boolean false "Filtrar apenas usuários ativos"
+// @Param ativos query boolean true "true = só ativos (padrão se omitido); false = incluir inativos"
 // @Success 200 {array} UsuarioResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
@@ -177,10 +177,14 @@ func (uc *UsuarioController) Listar(c *gin.Context) {
 		return
 	}
 
+	// Sem query: apenas ativos (padrão). ?ativos=false inclui desligados.
 	var filtro *bool
 	if param := c.Query("ativos"); param != "" {
 		ativo := param == "true"
 		filtro = &ativo
+	} else {
+		somenteAtivos := true
+		filtro = &somenteAtivos
 	}
 
 	usuarios, err := uc.usuarioService.ListarPorClinica(clinicaId, filtro)

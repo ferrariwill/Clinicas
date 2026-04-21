@@ -1,10 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { format, parseISO, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/hooks/use-auth"
+import { computeTelasLiberadas, useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
 import { useAgendaDia, usePacientes, useProfissionais, useAtualizarStatusAgenda } from "@/hooks/use-agenda"
 import type { AgendaResponse, PacienteResponse } from "@/types/api"
 import { Button } from "@/components/ui/button"
@@ -23,7 +25,13 @@ function horaAgenda(dataHorario: string) {
 }
 
 export default function AtendimentosPage() {
-  const { usuario, hasPermission } = useAuth()
+  const router = useRouter()
+  const { usuario, userRole } = useAuth()
+  const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
+  const { podeAtendimentos } = useMemo(
+    () => computeTelasLiberadas(permissoesOk ? permRotas : undefined, userRole),
+    [permRotas, userRole, permissoesOk]
+  )
   const [selectedDay, setSelectedDay] = useState(() => new Date())
   const [profissionalFiltro, setProfissionalFiltro] = useState("")
 
@@ -31,8 +39,12 @@ export default function AtendimentosPage() {
   const isMedico = usuario?.tipo_usuario === "MEDICO"
   const isDono = usuario?.tipo_usuario === "DONO" || usuario?.tipo_usuario === "DONO_CLINICA"
   const isSecretaria = usuario?.tipo_usuario === "SECRETARIA"
-  const podeVer = hasPermission(["MEDICO", "DONO", "DONO_CLINICA", "SECRETARIA"])
   const podeFiltrarTodosProfissionais = isDono || isSecretaria
+
+  useEffect(() => {
+    if (!permissoesOk) return
+    if (!podeAtendimentos) router.replace("/agenda")
+  }, [permissoesOk, podeAtendimentos, router])
 
   const usuarioQueryId =
     isMedico && usuario?.id ? usuario.id : profissionalFiltro || undefined
@@ -65,11 +77,11 @@ export default function AtendimentosPage() {
 
   if (!usuario) return null
 
-  if (!podeVer) {
+  if (!permissoesOk || !podeAtendimentos) {
     return (
       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-900">
-        <p className="font-medium">Acesso restrito</p>
-        <p className="mt-2 text-amber-800">Esta área é voltada a médicos, dono e secretaria da clínica.</p>
+        <p className="font-medium">Carregando permissões…</p>
+        <p className="mt-2 text-amber-800">Se você não tiver acesso a Meus atendimentos, será redirecionado.</p>
       </div>
     )
   }
@@ -78,12 +90,11 @@ export default function AtendimentosPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
-            <Stethoscope className="h-8 w-8 text-sky-600" />
-            Meus atendimentos
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 max-w-2xl">
-            Veja os agendamentos do dia e abra o prontuário do paciente para registrar evolução, queixas e conduta.
+          <p className="text-sm text-slate-600 max-w-2xl flex items-start gap-2">
+            <Stethoscope className="h-5 w-5 text-sky-600 shrink-0 mt-0.5" aria-hidden />
+            <span>
+              Veja os agendamentos do dia e abra o prontuário do paciente para registrar evolução, queixas e conduta.
+            </span>
           </p>
         </div>
         {podeFiltrarTodosProfissionais && (

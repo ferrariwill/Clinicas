@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { Users, Plus, Pencil, UserX, UserCheck, Clock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +20,7 @@ import {
   useDefinirHorariosUsuarioClinica,
 } from "@/hooks/use-clinica-equipe"
 import { useAuth } from "@/hooks/use-auth"
+import { computeTelasLiberadas, useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
 import type { UsuarioResponse } from "@/types/api"
 import { toast } from "sonner"
 import { apiClient } from "@/services/api-client"
@@ -63,9 +65,21 @@ function linhasGradeIniciais(): LinhaGrade[] {
 }
 
 export default function EquipePage() {
+  const router = useRouter()
   const queryClient = useQueryClient()
-  const { usuario, hasPermission } = useAuth()
+  const { usuario, hasPermission, userRole } = useAuth()
+  const [incluirInativos, setIncluirInativos] = useState(false)
+  const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
+  const { podeEquipe } = useMemo(
+    () => computeTelasLiberadas(permissoesOk ? permRotas : undefined, userRole),
+    [permRotas, userRole, permissoesOk]
+  )
   const podeGerenciar = hasPermission(["DONO", "DONO_CLINICA", "ADM_GERAL"])
+
+  useEffect(() => {
+    if (!permissoesOk) return
+    if (!podeEquipe) router.replace("/agenda")
+  }, [permissoesOk, podeEquipe, router])
   const [open, setOpen] = useState(false)
   const [openEdit, setOpenEdit] = useState(false)
   const [openHorarios, setOpenHorarios] = useState(false)
@@ -78,7 +92,7 @@ export default function EquipePage() {
   const [form, setForm] = useState(empty)
   const [editForm, setEditForm] = useState({ nome: "", email: "", senha: "", tipo_usuario_id: 0 })
   const { data: tipos, isLoading: loadingTipos } = useTiposUsuarioClinica()
-  const { data: usuarios, isLoading: loadingUsers } = useUsuariosClinica()
+  const { data: usuarios, isLoading: loadingUsers } = useUsuariosClinica(incluirInativos)
   const criar = useCriarUsuarioClinica()
   const atualizar = useAtualizarUsuarioClinica()
   const desativar = useDesativarUsuarioClinica()
@@ -214,12 +228,27 @@ export default function EquipePage() {
     )
   }
 
+  if (!permissoesOk) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-900">
+        <p className="font-medium">Carregando permissões…</p>
+      </div>
+    )
+  }
+  if (!podeEquipe) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-900">
+        <p className="font-medium">Sem acesso a esta área</p>
+        <p className="mt-2 text-amber-800">Redirecionando…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Equipe da clínica</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="text-sm text-slate-600">
             Cadastre médicos e secretárias e defina os dias e horários em que cada um atende — necessário para liberar
             horários na agenda.
           </p>
@@ -231,10 +260,21 @@ export default function EquipePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Usuários ({usuarios?.length ?? 0})
-          </CardTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Usuários ({usuarios?.length ?? 0})
+            </CardTitle>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                checked={incluirInativos}
+                onChange={(e) => setIncluirInativos(e.target.checked)}
+              />
+              Mostrar inativos
+            </label>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingUsers && <p className="text-sm text-slate-400">Carregando...</p>}

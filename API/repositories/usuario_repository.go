@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"github.com/ferrariwill/Clinicas/API/models"
+	"github.com/ferrariwill/Clinicas/API/utils"
 	"gorm.io/gorm"
 )
 
@@ -29,7 +30,8 @@ func NovoUsuarioRepository(db *gorm.DB) UsuarioRepository {
 
 func (r *usuarioRepository) BuscarPorEmail(email string) (*models.Usuario, error) {
 	var usuario models.Usuario
-	err := r.db.Preload("TipoUsuario").Where("email = ?", email).First(&usuario).Error
+	n := utils.NormalizarEmail(email)
+	err := r.db.Preload("TipoUsuario").Where("LOWER(TRIM(email)) = ?", n).First(&usuario).Error
 	if err != nil {
 		return nil, err
 	}
