@@ -81,5 +81,11 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|public).*)"],
+  matcher: [
+    /*
+     * Evita rodar middleware em estáticos, RSC/data e API.
+     * Padrão recomendado pelo Next.js (evita efeitos colaterais no Vercel).
+     */
+    "/((?!api|_next/static|_next/image|_next/data|favicon.ico|.*\\..*).*)",
+  ],
 }
