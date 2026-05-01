@@ -211,13 +211,43 @@ func (cc *ClinicaController) Buscar(c *gin.Context) {
 }
 
 func (cc *ClinicaController) Atualizar(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	var clinica models.Clinica
-	if err := c.ShouldBindJSON(&clinica); err != nil {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "ID da clínica inválido"})
+		return
+	}
+
+	existing, err := cc.service.BuscarPorID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"erro": "Clínica não encontrada"})
+		return
+	}
+
+	var incoming models.Clinica
+	if err := c.ShouldBindJSON(&incoming); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"erro": "Dados inválidos"})
 		return
 	}
-	clinica.ID = uint(id)
+
+	if strings.TrimSpace(incoming.Nome) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "nome é obrigatório"})
+		return
+	}
+
+	existing.Nome = strings.TrimSpace(incoming.Nome)
+	existing.Documento = strings.TrimSpace(incoming.Documento)
+	existing.CNPJ = strings.TrimSpace(incoming.CNPJ)
+	if existing.CNPJ == "" && len(existing.Documento) == 14 {
+		existing.CNPJ = existing.Documento
+	}
+	existing.EmailResponsavel = strings.TrimSpace(incoming.EmailResponsavel)
+	existing.NomeResponsavel = strings.TrimSpace(incoming.NomeResponsavel)
+	existing.Telefone = strings.TrimSpace(incoming.Telefone)
+	existing.Endereco = strings.TrimSpace(incoming.Endereco)
+	if incoming.Capacidade > 0 {
+		existing.Capacidade = incoming.Capacidade
+	}
+	existing.Ativa = incoming.Ativa
 
 	usuarioClinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
@@ -231,12 +261,14 @@ func (cc *ClinicaController) Atualizar(c *gin.Context) {
 		return
 	}
 
-	if err := cc.service.AtualizarClinica(&clinica, usuarioClinicaID, tipoUsuarioID); err != nil {
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+
+	if err := cc.service.AtualizarClinica(existing, usuarioClinicaID, tipoUsuarioID, papel); err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"erro": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"clinica": clinica})
+	c.JSON(http.StatusOK, gin.H{"clinica": existing})
 }
 
 func (cc *ClinicaController) Desativar(c *gin.Context) {
@@ -331,5 +363,40 @@ func (cc *ClinicaController) AtualizarConfiguracoes(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, config)
+}
+
+// BuscarConfiguracoesAdmin retorna configurações de qualquer clínica (apenas administrador da plataforma).
+func (cc *ClinicaController) BuscarConfiguracoesAdmin(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "ID da clínica inválido"})
+		return
+	}
+	config, err := cc.configService.BuscarConfiguracao(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, config)
+}
+
+// AtualizarConfiguracoesAdmin atualiza configurações de qualquer clínica (apenas administrador da plataforma).
+func (cc *ClinicaController) AtualizarConfiguracoesAdmin(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "ID da clínica inválido"})
+		return
+	}
+	var req dto.ConfiguracaoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "Dados inválidos"})
+		return
+	}
+	config, err := cc.configService.AtualizarConfiguracao(uint(id), &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, config)
 }

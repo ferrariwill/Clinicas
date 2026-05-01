@@ -23,4 +23,6 @@ type Paciente struct {
 	Clinica    Clinica   `gorm:"foreignKey:ClinicaID" json:"clinica"`
 	ConvenioID *uint     `json:"convenio_id"`
 	Convenio   *Convenio `gorm:"foreignKey:ConvenioID" json:"convenio"`
+	// AsaasCustomerID cache do cliente no gateway (opcional).
+	AsaasCustomerID string `json:"asaas_customer_id,omitempty" gorm:"size:64"`
 }

@@ -1,3 +1,11 @@
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+import nextEnv from "@next/env"
+
+/** Variáveis de SMTP e CONTACT_EMAIL ficam na raiz do monorepo (../.env), sem duplicar no FRONT. */
+const frontDir = path.dirname(fileURLToPath(import.meta.url))
+nextEnv.loadEnvConfig(path.join(frontDir, ".."))
+
 const nextConfig = {
   reactStrictMode: true,
   images: {

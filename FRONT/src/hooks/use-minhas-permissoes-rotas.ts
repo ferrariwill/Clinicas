@@ -21,6 +21,7 @@ export type MinhasPermRotasPayload = {
 /**
  * Alinha menu e guards ao que a API retorna para o tipo_usuario_id do token.
  * Não usar hasPermission(SECRETARIA) para itens de menu — isso ignorava "Perfis e telas".
+ * O dono ajusta quais rotas viram menu em Gestão → Perfis e telas (permissões por tipo de usuário na clínica).
  */
 function papelNorm(r: string | null): string {
   return (r ?? "").trim().toUpperCase()
@@ -31,7 +32,8 @@ export function computeTelasLiberadas(
   userRole: string | null
 ) {
   const p = papelNorm(userRole)
-  const acessoTotalTelas = Boolean(perm?.acesso_total) || p === "DONO"
+  /** Somente o que a API retornar (dono já vem com acesso_total no token de perfis). */
+  const acessoTotalTelas = Boolean(perm?.acesso_total)
   const rotasApi = perm?.rotas ?? []
 
   const podeGestaoPerfis = p === "DONO" || p === "DONO_CLINICA" || p === "ADM_GERAL"
@@ -68,6 +70,12 @@ export function computeTelasLiberadas(
     podeGestaoPerfis &&
     (acessoTotalTelas || rotaPrefixLiberada(rotasApi, false, "/clinicas/gestao"))
 
+  const podePagamentos =
+    acessoTotalTelas || rotaPrefixLiberada(rotasApi, false, "/clinicas/cobrancas")
+
+  const podeRelatorioRecebimentos =
+    acessoTotalTelas || rotasApi.some((r) => r === "/clinicas/cobrancas/relatorio-financeiro")
+
   return {
     acessoTotalTelas,
     rotasApi,
@@ -80,6 +88,8 @@ export function computeTelasLiberadas(
     podeProcedimentos,
     podeConvenios,
     podeGestaoTelas,
+    podePagamentos,
+    podeRelatorioRecebimentos,
   }
 }
 

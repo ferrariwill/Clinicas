@@ -177,6 +177,15 @@ export function mapAgendaFromAPI(raw: Record<string, unknown>): AgendaResponse {
     dataHorario = (dh as Date).toISOString()
   }
 
+  const libRaw = raw.liberado_cobranca_em ?? raw.LiberadoCobrancaEm
+  let liberado_cobranca_em: string | null | undefined
+  if (typeof libRaw === "string" && libRaw) liberado_cobranca_em = libRaw
+  else if (libRaw && typeof libRaw === "object" && libRaw !== null && "toISOString" in (libRaw as object)) {
+    liberado_cobranca_em = (libRaw as Date).toISOString()
+  } else {
+    liberado_cobranca_em = null
+  }
+
   return {
     id: String(id ?? ""),
     paciente_id: pid,
@@ -191,6 +200,7 @@ export function mapAgendaFromAPI(raw: Record<string, unknown>): AgendaResponse {
     duracao_total_minutos: durTotal > 0 ? durTotal : undefined,
     data_horario: dataHorario,
     status: statusNome ? String(statusNome).toUpperCase() : "",
+    liberado_cobranca_em,
     criado_em:
       typeof raw.criado_em === "string"
         ? raw.criado_em
@@ -413,6 +423,23 @@ export const useReativarProcedimento = () => {
   })
 }
 
+export const useAtualizarProfissionalAgenda = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ agendaId, usuarioId }: { agendaId: string; usuarioId: string }) => {
+      return await apiClient.atualizarProfissionalAgenda(agendaId, usuarioId)
+    },
+    onSuccess: () => {
+      toast.success("Profissional do agendamento atualizado.")
+      queryClient.invalidateQueries({ queryKey: ["agenda-dia"] })
+    },
+    onError: (e: unknown) => {
+      const err = e as { message?: string; response?: { data?: { erro?: string } } }
+      toast.error(err.response?.data?.erro || err.message || "Erro ao trocar profissional")
+    },
+  })
+}
+
 export const useAtualizarStatusAgenda = () => {
   const queryClient = useQueryClient()
 
@@ -437,6 +464,21 @@ export const useAtualizarStatusAgenda = () => {
     onError: (e: unknown) => {
       const err = e as { message?: string }
       toast.error(err.message || "Erro ao atualizar status do agendamento")
+    },
+  })
+}
+
+export const useLiberarCobrancaAgenda = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (agendaId: string) => apiClient.liberarCobrancaAgenda(agendaId),
+    onSuccess: () => {
+      toast.success("Consulta liberada para pagamento na recepção.")
+      queryClient.invalidateQueries({ queryKey: ["agenda-dia"] })
+    },
+    onError: (e: unknown) => {
+      const err = e as { message?: string; response?: { data?: { erro?: string } } }
+      toast.error(err.response?.data?.erro || err.message || "Não foi possível liberar cobrança")
     },
   })
 }

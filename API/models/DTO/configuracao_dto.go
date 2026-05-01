@@ -16,6 +16,9 @@ type ConfiguracaoRequest struct {
 	EmailNotificacao       string `json:"email_notificacao" example:"contato@clinica.com"`
 	TelefoneWhatsapp       string `json:"telefone_whatsapp" example:"11999999999"`
 	MensagemBoasVindas     string `json:"mensagem_boas_vindas" example:"Bem-vindo à nossa clínica!"`
+	UsaCobrancaIntegrada   bool   `json:"usa_cobranca_integrada"`
+	CadastroAsaasAtivo     bool   `json:"cadastro_asaas_ativo"`
+	PercentualSplitSistema float64 `json:"percentual_split_sistema"`
 }
 
 // ConfiguracaoResponse representa a resposta de configuração
@@ -36,4 +39,7 @@ type ConfiguracaoResponse struct {
 	EmailNotificacao       string `json:"email_notificacao" example:"contato@clinica.com"`
 	TelefoneWhatsapp       string `json:"telefone_whatsapp" example:"11999999999"`
 	MensagemBoasVindas     string `json:"mensagem_boas_vindas" example:"Bem-vindo à nossa clínica!"`
+	UsaCobrancaIntegrada   bool   `json:"usa_cobranca_integrada"`
+	CadastroAsaasAtivo     bool   `json:"cadastro_asaas_ativo"`
+	PercentualSplitSistema float64 `json:"percentual_split_sistema"`
 }

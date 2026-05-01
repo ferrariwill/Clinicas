@@ -70,11 +70,13 @@ export default function EquipePage() {
   const { usuario, hasPermission, userRole } = useAuth()
   const [incluirInativos, setIncluirInativos] = useState(false)
   const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
-  const { podeEquipe } = useMemo(
+  const { podeEquipe, acessoTotalTelas } = useMemo(
     () => computeTelasLiberadas(permissoesOk ? permRotas : undefined, userRole),
     [permRotas, userRole, permissoesOk]
   )
-  const podeGerenciar = hasPermission(["DONO", "DONO_CLINICA", "ADM_GERAL"])
+  /** Dono/admin ou perfil com acesso total às telas (ex.: “gestor” com todas as rotas) pode desativar e editar equipe. */
+  const podeGerenciar =
+    hasPermission(["DONO", "DONO_CLINICA", "ADM_GERAL"]) || acessoTotalTelas
 
   useEffect(() => {
     if (!permissoesOk) return

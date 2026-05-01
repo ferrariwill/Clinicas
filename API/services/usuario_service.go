@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ferrariwill/Clinicas/API/internal/mail"
 	"github.com/ferrariwill/Clinicas/API/models"
@@ -41,11 +42,29 @@ func NovoUsuarioService(repo repositories.UsuarioRepository, ucRepo repositories
 }
 
 func (s *usuarioService) CriarUsuario(u *models.Usuario, clinicaId uint) error {
+	u.Nome = strings.TrimSpace(u.Nome)
+	if u.Nome == "" {
+		return errors.New("informe o nome do usuário")
+	}
+	if utf8.RuneCountInString(u.Nome) < 2 {
+		return errors.New("o nome deve ter pelo menos 2 caracteres")
+	}
 	u.Email = utils.NormalizarEmail(u.Email)
+	if u.Email == "" {
+		return errors.New("e-mail inválido")
+	}
 	u.ClinicaID = clinicaId
 	u.Ativo = true
-	u.ObrigarTrocaSenha = false
-	hash, err := utils.HashSenha(u.Senha)
+
+	plain := strings.TrimSpace(u.Senha)
+	obrigar := false
+	if plain == "" {
+		plain = utils.SenhaAleatoria(14)
+		obrigar = true
+	}
+	u.ObrigarTrocaSenha = obrigar
+
+	hash, err := utils.HashSenha(plain)
 	if err != nil {
 		return err
 	}
@@ -56,18 +75,22 @@ func (s *usuarioService) CriarUsuario(u *models.Usuario, clinicaId uint) error {
 		if ex.Ativo {
 			return errors.New("já existe um usuário ativo cadastrado com este e-mail")
 		}
-		ex.Nome = strings.TrimSpace(u.Nome)
+		ex.Nome = u.Nome
 		ex.Email = u.Email
 		ex.Senha = hash
 		ex.ClinicaID = clinicaId
 		ex.TipoUsuarioID = u.TipoUsuarioID
 		ex.Ativo = true
-		ex.ObrigarTrocaSenha = false
+		ex.ObrigarTrocaSenha = obrigar
 		if err := s.repo.AtualizarUsuario(ex); err != nil {
 			return err
 		}
 		*u = *ex
-		return s.ucRepo.GarantirVinculoAtivo(ex.ID, clinicaId, u.TipoUsuarioID)
+		if err := s.ucRepo.GarantirVinculoAtivo(ex.ID, clinicaId, u.TipoUsuarioID); err != nil {
+			return err
+		}
+		_, errMail := s.enviarEmailAcessoEquipe(ex.Email, ex.Nome, plain, obrigar)
+		return errMail
 	}
 	if errEx != nil && !errors.Is(errEx, gorm.ErrRecordNotFound) {
 		return errEx
@@ -76,12 +99,16 @@ func (s *usuarioService) CriarUsuario(u *models.Usuario, clinicaId uint) error {
 	if err := s.repo.CriarUsuario(u); err != nil {
 		return err
 	}
-	return s.ucRepo.Criar(&models.UsuarioClinica{
+	if err := s.ucRepo.Criar(&models.UsuarioClinica{
 		UsuarioID:     u.ID,
 		ClinicaID:     clinicaId,
 		TipoUsuarioID: u.TipoUsuarioID,
 		Ativo:         true,
-	})
+	}); err != nil {
+		return err
+	}
+	_, errMail := s.enviarEmailAcessoEquipe(u.Email, u.Nome, plain, obrigar)
+	return errMail
 }
 
 func (s *usuarioService) ListarPorClinica(clinicaId uint, soAtivos *bool) ([]models.Usuario, error) {

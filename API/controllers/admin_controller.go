@@ -1,13 +1,19 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
 
+	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/internal/retention"
 	"github.com/ferrariwill/Clinicas/API/models"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	servicedto "github.com/ferrariwill/Clinicas/API/models/DTO/ServiceDTO"
+	"github.com/ferrariwill/Clinicas/API/middleware"
 	"github.com/ferrariwill/Clinicas/API/repositories"
 	"github.com/ferrariwill/Clinicas/API/services"
 	"github.com/ferrariwill/Clinicas/API/utils"
@@ -20,6 +26,7 @@ type AdminController struct {
 	TelaService       services.TelaService
 	PlanoTelaService  services.PlanoTelaService
 	AssinaturaService services.AssinaturaService
+	UsuarioService    services.UsuarioService
 	AuditLogRepo      repositories.AuditLogRepository
 	DB                *gorm.DB
 }
@@ -28,6 +35,7 @@ func NovoAdminController(planoService services.PlanoService,
 	telaService services.TelaService,
 	planoTelaService services.PlanoTelaService,
 	assinaturaService services.AssinaturaService,
+	usuarioService services.UsuarioService,
 	auditLogRepo repositories.AuditLogRepository,
 	db *gorm.DB,
 ) AdminController {
@@ -36,6 +44,7 @@ func NovoAdminController(planoService services.PlanoService,
 		TelaService:       telaService,
 		PlanoTelaService:  planoTelaService,
 		AssinaturaService: assinaturaService,
+		UsuarioService:    usuarioService,
 		AuditLogRepo:      auditLogRepo,
 		DB:                db,
 	}
@@ -175,6 +184,205 @@ func (ac AdminController) ConsultarAssinaturaClinica(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, assinatura)
+}
+
+// assinaturaPrincipalClinica retorna a assinatura ativa mais recente; se não houver ativa, a mais recente da clínica.
+func (ac AdminController) assinaturaPrincipalClinica(clinicaID uint) (*models.Assinatura, error) {
+	var rows []models.Assinatura
+	if err := ac.DB.Where("clinica_id = ?", clinicaID).Order("id DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if rows[i].Ativa {
+			return &rows[i], nil
+		}
+	}
+	if len(rows) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &rows[0], nil
+}
+
+// CriarUsuarioPlataforma cadastra um novo usuário com papel ADM_GERAL (administrador do sistema).
+func (ac AdminController) CriarUsuarioPlataforma(c *gin.Context) {
+	var body dto.CriarUsuarioPlataformaDTO
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos", "detalhe": err.Error()})
+		return
+	}
+	if t := strings.TrimSpace(body.Senha); t != "" && utf8.RuneCountInString(t) < 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Senha deve ter pelo menos 6 caracteres ou omita o campo para gerar senha provisória e enviar por e-mail"})
+		return
+	}
+	var tu models.TipoUsuario
+	if err := ac.DB.Where("papel = ?", rbac.PapelADMGeral).Order("id ASC").First(&tu).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Perfil de administrador da plataforma não encontrado. Execute as migrations."})
+		return
+	}
+	u := models.Usuario{
+		Nome:          strings.TrimSpace(body.Nome),
+		Email:         strings.TrimSpace(body.Email),
+		Senha:         body.Senha,
+		TipoUsuarioID: tu.ID,
+	}
+	if err := ac.UsuarioService.CriarUsuario(&u, tu.ClinicaID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	u.Senha = ""
+	c.JSON(http.StatusCreated, gin.H{
+		"usuario":        u,
+		"obrigar_troca": u.ObrigarTrocaSenha,
+	})
+}
+
+// DesativarUsuarioAdmin desativa um usuário com papel ADM_GERAL (não pode ser a própria sessão).
+func (ac AdminController) DesativarUsuarioAdmin(c *gin.Context) {
+	actorID, err := middleware.ExtrairDoToken[uint](c, "usuario_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	id, err := utils.StringParaUint(c.Param("id"))
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do usuário inválido"})
+		return
+	}
+	if id == actorID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Não é possível desativar a própria conta"})
+		return
+	}
+	alvo, err := ac.UsuarioService.BuscarPorID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Usuário não encontrado"})
+		return
+	}
+	if alvo.TipoUsuario.Papel != rbac.PapelADMGeral {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Só é permitido desativar contas de administrador da plataforma (ADM_GERAL)"})
+		return
+	}
+	if err := ac.UsuarioService.DesativarUsuario(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Usuário desativado com sucesso"})
+}
+
+// ReativarUsuarioAdmin reativa um usuário com papel ADM_GERAL.
+func (ac AdminController) ReativarUsuarioAdmin(c *gin.Context) {
+	id, err := utils.StringParaUint(c.Param("id"))
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID do usuário inválido"})
+		return
+	}
+	alvo, err := ac.UsuarioService.BuscarPorID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Usuário não encontrado"})
+		return
+	}
+	if alvo.TipoUsuario.Papel != rbac.PapelADMGeral {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Só é permitido reativar contas de administrador da plataforma (ADM_GERAL)"})
+		return
+	}
+	if err := ac.UsuarioService.ReativarUsuario(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Usuário reativado com sucesso"})
+}
+
+// AtualizarPlanoClinica altera o plano_id da assinatura principal da clínica.
+func (ac AdminController) AtualizarPlanoClinica(c *gin.Context) {
+	id, err := utils.StringParaUint(c.Param("id"))
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID da clínica inválido"})
+		return
+	}
+	var body dto.AtualizarPlanoClinicaDTO
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos", "detalhe": err.Error()})
+		return
+	}
+	if _, err := ac.PlanoService.BuscarPorId(int(body.PlanoID)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Plano não encontrado"})
+		return
+	}
+	a, err := ac.assinaturaPrincipalClinica(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Nenhuma assinatura para esta clínica. Crie uma assinatura no financeiro."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	a.PlanoID = body.PlanoID
+	if err := ac.AssinaturaService.Atualizar(a); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar assinatura"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"assinatura": a})
+}
+
+// AtualizarAssinaturaAdmin ajusta plano, data de expiração e/ou flag ativa de uma assinatura específica.
+func (ac AdminController) AtualizarAssinaturaAdmin(c *gin.Context) {
+	aid, err := utils.StringParaUint(c.Param("id"))
+	if err != nil || aid == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID da assinatura inválido"})
+		return
+	}
+	var body dto.AtualizarAssinaturaAdminDTO
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos", "detalhe": err.Error()})
+		return
+	}
+	if body.PlanoID == nil && body.DataExpiracao == nil && body.Ativa == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Informe ao menos um campo: plano_id, data_expiracao ou ativa"})
+		return
+	}
+	a, err := ac.AssinaturaService.BuscarPorID(aid)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Assinatura não encontrada"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if body.PlanoID != nil {
+		if _, err := ac.PlanoService.BuscarPorId(int(*body.PlanoID)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Plano não encontrado"})
+			return
+		}
+		a.PlanoID = *body.PlanoID
+	}
+	if body.DataExpiracao != nil {
+		s := strings.TrimSpace(*body.DataExpiracao)
+		if s == "" {
+			a.DataExpiracao = nil
+		} else {
+			t, err := time.ParseInLocation("2006-01-02", s, time.Local)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "data_expiracao inválida; use YYYY-MM-DD"})
+				return
+			}
+			di := time.Date(a.DataInicio.Year(), a.DataInicio.Month(), a.DataInicio.Day(), 0, 0, 0, 0, time.Local)
+			te := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
+			if te.Before(di) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "data_expiracao não pode ser anterior ao início da assinatura"})
+				return
+			}
+			a.DataExpiracao = &t
+		}
+	}
+	if body.Ativa != nil {
+		a.Ativa = *body.Ativa
+	}
+	if err := ac.AssinaturaService.Atualizar(a); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar assinatura"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"assinatura": a})
 }
 
 /*Planos*/

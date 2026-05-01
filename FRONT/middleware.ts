@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const publicRoutes = ["/login", "/esqueci-senha", "/redefinir-senha"]
+const publicRoutes = ["/", "/login", "/esqueci-senha", "/redefinir-senha"]
 
 /** Rotas que exigem JWT no cookie. */
 const protectedRoutes = [
@@ -15,7 +15,9 @@ const protectedRoutes = [
   "/procedimentos",
   "/convenios",
   "/gestao",
+  "/pagamentos",
   "/trocar-senha",
+  "/perfil",
 ]
 
 function obrigarTrocaSenhaFromCookie(raw: string | undefined): boolean {
@@ -70,11 +72,15 @@ export function middleware(request: NextRequest) {
       const dest = userRole === "ADM_GERAL" ? "/admin/dashboard" : "/dashboard"
       return NextResponse.redirect(new URL(dest, request.url))
     }
-    return NextResponse.redirect(new URL("/login", request.url))
+    return NextResponse.next()
   }
 
   if (token && userRole === "ADM_GERAL" && pathname.startsWith("/dashboard") && !pathname.startsWith("/admin")) {
     return NextResponse.redirect(new URL("/admin/dashboard", request.url))
+  }
+
+  if (token && userRole === "ADM_GERAL" && pathname === "/perfil") {
+    return NextResponse.redirect(new URL("/admin/perfil", request.url))
   }
 
   return NextResponse.next()

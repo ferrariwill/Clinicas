@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ferrariwill/Clinicas/API/internal/audit"
+	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	servicedto "github.com/ferrariwill/Clinicas/API/models/DTO/ServiceDTO"
@@ -49,6 +50,12 @@ func (ac AgendaController) Criar(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
+	}
+
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	uidTok, errUID := middleware.ExtrairDoToken[uint](c, "usuario_id")
+	if errUID == nil && papel == rbac.PapelMedico {
+		agendaDTO.UsuarioID = uidTok
 	}
 
 	ids := agendaDTO.ProcedimentoIDs
@@ -115,6 +122,12 @@ func (ac AgendaController) Listar(c *gin.Context) {
 		}
 	}
 
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	meuID, errMe := middleware.ExtrairDoToken[uint](c, "usuario_id")
+	if errMe == nil && papel == rbac.PapelMedico {
+		usuarioFiltro = &meuID
+	}
+
 	agendas, err := ac.service.Listar(clinicaID, dia, usuarioFiltro)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -168,6 +181,23 @@ func (ac AgendaController) AtualizarStatus(c *gin.Context) {
 		return
 	}
 
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if papel == rbac.PapelMedico {
+		ag, errA := ac.service.BuscarPorIDClinica(clinicaID, id)
+		if errA != nil {
+			if errors.Is(errA, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusNotFound, gin.H{"erro": "Agendamento não encontrado"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"erro": errA.Error()})
+			return
+		}
+		if ag.UsuarioID != usuarioID {
+			c.JSON(http.StatusForbidden, gin.H{"erro": "Você só pode alterar status dos seus próprios agendamentos"})
+			return
+		}
+	}
+
 	stID := body.StatusID
 	if stID == 0 && strings.TrimSpace(body.Status) != "" {
 		nome := strings.TrimSpace(body.Status)
@@ -199,6 +229,94 @@ func (ac AgendaController) AtualizarStatus(c *gin.Context) {
 
 }
 
+// LiberarCobranca marca a consulta como liberada para a secretaria cobrar (status deve ser Realizado).
+func (ac AgendaController) LiberarCobranca(c *gin.Context) {
+	id, err := utils.StringParaUint(c.Param("id"))
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "ID inválido"})
+		return
+	}
+	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
+		return
+	}
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	switch papel {
+	case rbac.PapelMedico, rbac.PapelDono, rbac.PapelADMGeral:
+	default:
+		c.JSON(http.StatusForbidden, gin.H{"erro": "Sem permissão"})
+		return
+	}
+	usuarioID, _ := middleware.ExtrairDoToken[uint](c, "usuario_id")
+	if papel == rbac.PapelMedico {
+		ag, errA := ac.service.BuscarPorIDClinica(clinicaID, id)
+		if errA != nil {
+			if errors.Is(errA, gorm.ErrRecordNotFound) {
+				c.JSON(http.StatusNotFound, gin.H{"erro": "Agendamento não encontrado"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"erro": errA.Error()})
+			return
+		}
+		if ag.UsuarioID != usuarioID {
+			c.JSON(http.StatusForbidden, gin.H{"erro": "Você só pode liberar cobrança dos seus próprios agendamentos"})
+			return
+		}
+	}
+	if err := ac.service.LiberarCobranca(clinicaID, id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"mensagem": "Cobrança liberada para a secretaria"})
+}
+
+// AtualizarProfissional troca o médico/profissional do agendamento (ex.: secretaria remarcando na mesma data/hora).
+func (ac AgendaController) AtualizarProfissional(c *gin.Context) {
+	id, err := utils.StringParaUint(c.Param("id"))
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "ID do agendamento inválido"})
+		return
+	}
+	var body struct {
+		UsuarioID uint `json:"usuario_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": "Dados inválidos", "detalhes": err.Error()})
+		return
+	}
+
+	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
+		return
+	}
+
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	switch papel {
+	case rbac.PapelSecretaria, rbac.PapelDono, rbac.PapelADMGeral:
+		// ok
+	default:
+		c.JSON(http.StatusForbidden, gin.H{"erro": "Sem permissão para alterar o profissional do agendamento"})
+		return
+	}
+
+	if err := ac.service.AtualizarProfissionalAgenda(clinicaID, id, body.UsuarioID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"erro": "Agendamento não encontrado"})
+			return
+		}
+		if errors.Is(err, repositories.ErrConflitoAgendamento) || errors.Is(err, repositories.ErrCapacidadeAgendaExcedida) {
+			c.JSON(http.StatusConflict, gin.H{"erro": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"mensagem": "Profissional do agendamento atualizado"})
+}
+
 // @Summary Horários Disponíveis
 // @Description Buscar horários disponíveis para agendamento
 // @Tags Agenda
@@ -221,6 +339,12 @@ func (ac AgendaController) HorariosDisponiveis(c *gin.Context) {
 	if err != nil || usuarioID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Usuário inválido"})
 		return
+	}
+
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	meuID, errMe := middleware.ExtrairDoToken[uint](c, "usuario_id")
+	if errMe == nil && papel == rbac.PapelMedico {
+		usuarioID = meuID
 	}
 
 	procedimentoID, err := utils.StringParaUint(c.Query("procedimento_id"))

@@ -3,8 +3,8 @@ import { Providers } from "./providers"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Clínicas - Sistema de Gerenciamento",
-  description: "API White Label de Clínicas",
+  title: "Facilita Clin — Sistema de gestão para clínicas",
+  description: "Plataforma de agenda, prontuário, financeiro e multiclínica.",
 }
 
 export const viewport: Viewport = {
@@ -22,9 +22,9 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#0ea5e9" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
-      <body className="bg-white text-gray-900 antialiased">
+      <body className="min-h-screen antialiased bg-white text-gray-900 transition-colors duration-200">
         <Providers>
           {children}
         </Providers>

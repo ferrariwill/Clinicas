@@ -15,7 +15,7 @@ type ProntuarioRegistro struct {
 	ClinicaID        uint    `json:"clinica_id"`
 	Clinica          Clinica `gorm:"foreignKey:ClinicaID"`
 	ProfissionalID   uint    `json:"profissional_id"`
-	Profissional     Usuario `gorm:"foreignKey:ProfissionalID"`
+	Profissional     Usuario `gorm:"foreignKey:ProfissionalID" json:"profissional,omitempty"`
 	Titulo           string  `json:"titulo"`
 	Conteudo         string  `gorm:"type:text" json:"conteudo"`
 }

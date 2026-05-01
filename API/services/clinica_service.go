@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 
+	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/models"
 	"github.com/ferrariwill/Clinicas/API/repositories"
 )
@@ -11,7 +12,7 @@ type ClinicaService interface {
 	CadastrarClinica(c *models.Clinica) error
 	ListarClinicas(soAtivas *bool) ([]*models.Clinica, error)
 	BuscarPorID(id uint) (*models.Clinica, error)
-	AtualizarClinica(c *models.Clinica, usuarioClinicaID uint, tipoUsuarioID uint) error
+	AtualizarClinica(c *models.Clinica, usuarioClinicaID uint, tipoUsuarioID uint, papel string) error
 	DesativarClinica(id uint) error
 	ReativarClinica(id uint) error
 }
@@ -37,9 +38,9 @@ func (s *clinicaService) BuscarPorID(id uint) (*models.Clinica, error) {
 	return s.repo.BuscarPorId(id)
 }
 
-func (s *clinicaService) AtualizarClinica(c *models.Clinica, usuarioClinicaID uint, tipoUsuarioID uint) error {
-	// Admin global pode tudo
-	if tipoUsuarioID == 1 {
+func (s *clinicaService) AtualizarClinica(c *models.Clinica, usuarioClinicaID uint, tipoUsuarioID uint, papel string) error {
+	// Administrador da plataforma (RBAC) ou legado tipo_usuario_id == 1
+	if papel == rbac.PapelADMGeral || tipoUsuarioID == 1 {
 		return s.repo.AtualiazarClinica(c)
 	}
 

@@ -1,12 +1,20 @@
 "use client"
 
-import { useState } from "react"
-import { DollarSign, TrendingUp, CheckCircle, XCircle, Plus } from "lucide-react"
+import { useState, useEffect } from "react"
+import { DollarSign, TrendingUp, CheckCircle, XCircle, Plus, Pencil } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { useAssinaturas, useCriarAssinatura, usePlanos, useAdminClinicas, CriarAssinaturaPayload } from "@/hooks/use-admin"
+import {
+  useAssinaturas,
+  useAtualizarAssinaturaAdmin,
+  useCriarAssinatura,
+  usePlanos,
+  useAdminClinicas,
+  type Assinatura,
+  CriarAssinaturaPayload,
+} from "@/hooks/use-admin"
 import { toast } from "sonner"
 import { dataBRToISO, dataISOToBR, maskDataBR } from "@/lib/utils/masks"
 
@@ -24,10 +32,25 @@ export default function AdminFinanceiroPage() {
   const [form, setForm] = useState<CriarAssinaturaPayload>(emptyForm)
   const [inicioBR, setInicioBR] = useState(dataISOToBR(emptyForm.data_inicio))
   const [fimBR, setFimBR] = useState("")
+  const [editRow, setEditRow] = useState<Assinatura | null>(null)
+  const [editPlano, setEditPlano] = useState(0)
+  const [editAtiva, setEditAtiva] = useState(true)
+  const [editFimBR, setEditFimBR] = useState("")
+  const [editSemFim, setEditSemFim] = useState(false)
   const { data: assinaturas, isLoading } = useAssinaturas()
   const { data: planos } = usePlanos()
   const { data: clinicas } = useAdminClinicas()
   const criar = useCriarAssinatura()
+  const atualizarAssinatura = useAtualizarAssinaturaAdmin()
+
+  useEffect(() => {
+    if (!editRow) return
+    setEditPlano(editRow.plano_id)
+    setEditAtiva(editRow.ativa)
+    const iso = editRow.data_expiracao?.slice(0, 10) ?? ""
+    setEditSemFim(!iso)
+    setEditFimBR(iso ? dataISOToBR(iso) : "")
+  }, [editRow])
 
   const ativas = assinaturas?.filter((a) => a.ativa) ?? []
   const receitaMensal = ativas.reduce((acc, a) => acc + (planos?.find((p) => p.id === a.plano_id)?.valor ?? 0), 0)
@@ -56,6 +79,35 @@ export default function AdminFinanceiroPage() {
           setForm(emptyForm)
           setInicioBR(dataISOToBR(emptyForm.data_inicio))
           setFimBR("")
+        },
+      }
+    )
+  }
+
+  const submitEditAssinatura = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editRow) return
+    let dataExp: string | null | undefined = undefined
+    if (editSemFim) {
+      dataExp = ""
+    } else {
+      const iso = dataBRToISO(editFimBR.trim())
+      if (!iso) {
+        toast.error("Data fim inválida (dd/mm/aaaa) ou marque “sem data de término”")
+        return
+      }
+      dataExp = iso
+    }
+    atualizarAssinatura.mutate(
+      {
+        id: editRow.id,
+        plano_id: editPlano,
+        data_expiracao: dataExp,
+        ativa: editAtiva,
+      },
+      {
+        onSuccess: () => {
+          setEditRow(null)
         },
       }
     )
@@ -106,6 +158,10 @@ export default function AdminFinanceiroPage() {
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${a.ativa ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
                       {a.ativa ? "Ativa" : "Inativa"}
                     </span>
+                    <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => setEditRow(a)}>
+                      <Pencil className="h-3 w-3" />
+                      Editar
+                    </Button>
                   </div>
                 </div>
               )
@@ -113,6 +169,77 @@ export default function AdminFinanceiroPage() {
           </div>
         </CardContent>
       </Card>
+      <Dialog open={!!editRow} onOpenChange={(v) => !v && setEditRow(null)}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogTitle>Editar assinatura</DialogTitle>
+          <DialogDescription>
+            Ajuste o plano, a data de término ou o status. Alterações valem para esta linha de assinatura (clínica #{editRow?.clinica_id}).
+          </DialogDescription>
+          {editRow && (
+            <form onSubmit={submitEditAssinatura} className="mt-4 space-y-4">
+              <div className="space-y-1">
+                <Label>Plano</Label>
+                <select
+                  value={editPlano}
+                  onChange={(e) => setEditPlano(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  required
+                >
+                  {planos?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome} {p.ativo ? "" : "(inativo)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="sem_fim"
+                  type="checkbox"
+                  checked={editSemFim}
+                  onChange={(e) => setEditSemFim(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                <Label htmlFor="sem_fim" className="font-normal cursor-pointer">
+                  Sem data de término
+                </Label>
+              </div>
+              {!editSemFim && (
+                <div className="space-y-1">
+                  <Label>Data de término</Label>
+                  <input
+                    inputMode="numeric"
+                    placeholder="dd/mm/aaaa"
+                    value={editFimBR}
+                    onChange={(e) => setEditFimBR(maskDataBR(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  id="edit_ativa"
+                  type="checkbox"
+                  checked={editAtiva}
+                  onChange={(e) => setEditAtiva(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                <Label htmlFor="edit_ativa" className="font-normal cursor-pointer">
+                  Assinatura ativa
+                </Label>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button type="button" variant="secondary" onClick={() => setEditRow(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={atualizarAssinatura.isPending}>
+                  {atualizarAssinatura.isPending ? "Salvando…" : "Salvar"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogTitle>Nova Assinatura</DialogTitle>

@@ -20,4 +20,10 @@ type ClinicaConfiguracao struct {
 	EmailNotificacao       string  `json:"email_notificacao" example:"contato@clinica.com"`
 	TelefoneWhatsapp       string  `json:"telefone_whatsapp" example:"11999999999"`
 	MensagemBoasVindas     string  `json:"mensagem_boas_vindas" example:"Bem-vindo à nossa clínica!"`
+	// UsaCobrancaIntegrada: não gera receita automática ao marcar "Realizado"; fila de pagamentos na recepção.
+	UsaCobrancaIntegrada bool `json:"usa_cobranca_integrada" gorm:"default:false"`
+	// CadastroAsaasAtivo: clínica com contrato/credenciais Asaas — Pix e cartão usam o gateway. Se false, apenas confirmação manual e dinheiro (sem chamadas Asaas).
+	CadastroAsaasAtivo bool `json:"cadastro_asaas_ativo" gorm:"default:true"`
+	// PercentualSplitSistema: percentual (0–100) do valor bruto enviado ao WalletID da plataforma no Asaas.
+	PercentualSplitSistema float64 `json:"percentual_split_sistema" gorm:"default:0"`
 }

@@ -45,6 +45,7 @@ func RunMigrations(db *gorm.DB) {
 		&models.Agenda{},
 		&models.AgendaProcedimento{},
 		&models.ProntuarioRegistro{},
+		&models.CobrancaConsulta{},
 	)
 
 	if err != nil {
@@ -61,6 +62,7 @@ func RunMigrations(db *gorm.DB) {
 	seedUsuarioClinicasLegacy(db)
 	ensureTiposProfissionaisClinicas(db)
 	seedCatalogoTelas(db)
+	ensureCobrancaPermissoes(db)
 	ensurePermissoesPadraoMedicoSecretaria(db)
 	ensureConvenioPermissaoSecretaria(db)
 	ensureCustosFixosPermissoes(db)
@@ -381,6 +383,11 @@ func seedCatalogoTelas(db *gorm.DB) {
 		{Nome: "Gestão — catálogo de telas", Rota: "/clinicas/gestao/telas", Descricao: "Perfis e permissões", Ativo: true},
 		{Nome: "Gestão — tipos de usuário", Rota: "/clinicas/gestao/tipos-usuario", Descricao: "CRUD de perfis", Ativo: true},
 		{Nome: "Gestão — permissões", Rota: "/clinicas/gestao/permissoes-tela", Descricao: "Associar telas ao perfil", Ativo: true},
+		{Nome: "Pagamentos — fila", Rota: "/clinicas/cobrancas/fila", Descricao: "Consultas liberadas para cobrança", Ativo: true},
+		{Nome: "Pagamentos — criar cobrança", Rota: "/clinicas/cobrancas", Descricao: "Pix/cartão (Asaas), dinheiro ou confirmação na recepção", Ativo: true},
+		{Nome: "Pagamentos — detalhe", Rota: "/clinicas/cobrancas/:id", Descricao: "Detalhe da cobrança", Ativo: true},
+		{Nome: "Pagamentos — relatório financeiro", Rota: "/clinicas/cobrancas/relatorio-financeiro", Descricao: "Recebimentos líquidos (dono)", Ativo: true},
+		{Nome: "Agenda — liberar cobrança", Rota: "/clinicas/agenda/:id/liberar-cobranca", Descricao: "Médico libera para secretaria", Ativo: true},
 	}
 	for _, t := range catalogo {
 		var n int64
@@ -390,6 +397,37 @@ func seedCatalogoTelas(db *gorm.DB) {
 		}
 		if err := db.Create(&t).Error; err != nil {
 			log.Printf("seedCatalogoTelas %s: %v", t.Rota, err)
+		}
+	}
+}
+
+// ensureCobrancaPermissoes concede telas de pagamento a perfis existentes (idempotente).
+func ensureCobrancaPermissoes(db *gorm.DB) {
+	extras := []struct {
+		papel string
+		rotas []string
+	}{
+		{rbac.PapelSecretaria, []string{
+			"/clinicas/cobrancas/fila", "/clinicas/cobrancas", "/clinicas/cobrancas/:id",
+		}},
+		{rbac.PapelMedico, []string{
+			"/clinicas/agenda/:id/liberar-cobranca",
+		}},
+		{rbac.PapelDono, []string{
+			"/clinicas/cobrancas/fila", "/clinicas/cobrancas", "/clinicas/cobrancas/:id",
+			"/clinicas/cobrancas/relatorio-financeiro", "/clinicas/agenda/:id/liberar-cobranca",
+		}},
+	}
+	for _, e := range extras {
+		var tipos []models.TipoUsuario
+		if err := db.Where("papel = ?", e.papel).Find(&tipos).Error; err != nil {
+			log.Printf("ensureCobrancaPermissoes listar tipos %s: %v", e.papel, err)
+			continue
+		}
+		for _, tu := range tipos {
+			for _, rota := range e.rotas {
+				grantPermIfMissing(db, tu.ID, telaIDByRota(db, rota))
+			}
 		}
 	}
 }

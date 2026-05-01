@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/models"
 	"github.com/ferrariwill/Clinicas/API/utils"
 	"gorm.io/gorm"
@@ -22,7 +23,9 @@ var ErrCapacidadeAgendaExcedida = errors.New("limite de atendimentos simultâneo
 type AgendaReposiory interface {
 	Criar(agenda models.Agenda, procedimentosExtras []uint) (models.Agenda, error)
 	Listar(clinicaID uint, dia *time.Time, usuarioID *uint) ([]models.Agenda, error)
-	AtualizarStatus(clinicaID, id, statusID, usuarioLancamentoID uint) error
+	AtualizarStatus(clinicaID, id, statusID, usuarioLancamentoID uint, pularReceitaAutomatica bool) error
+	LiberarCobranca(clinicaID, agendaID uint) error
+	AtualizarProfissionalAgenda(clinicaID, agendaID, novoUsuarioID uint) error
 	HorariosDisponiveis(usuarioID, clinicaID, procedimentoID uint, data time.Time, duracaoTotalMin uint) ([]time.Time, error)
 	BuscarPorIDClinica(id, clinicaID uint) (*models.Agenda, error)
 	StatusIDPorNome(nome string) (uint, error)
@@ -171,6 +174,14 @@ func (r *agendaRepository) Criar(agenda models.Agenda, procedimentosExtras []uin
 
 		duracao := duracaoNovaConsultaTx(tx, agenda.ClinicaID, agenda.ProcedimentoID, procedimentosExtras)
 
+		locSP := utils.LocSaoPaulo()
+		ah := agenda.DataHora.In(locSP)
+		now := time.Now().In(locSP)
+		nowMin := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, locSP)
+		if ah.Before(nowMin) {
+			return errors.New("não é permitido agendar em horário retroativo: escolha um horário igual ou posterior ao horário atual")
+		}
+
 		if err := validaHorarioNaGradeProfissional(tx, agenda.UsuarioID, agenda.DataHora, duracao); err != nil {
 			return err
 		}
@@ -250,7 +261,30 @@ func (r *agendaRepository) Listar(clinicaID uint, dia *time.Time, usuarioID *uin
 	return agendas, err
 }
 
-func (r *agendaRepository) AtualizarStatus(clinicaID, id, statusID, usuarioLancamentoID uint) error {
+func (r *agendaRepository) LiberarCobranca(clinicaID, agendaID uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var agenda models.Agenda
+		if err := tx.Preload("StatusAgendamento").Where("id = ? AND clinica_id = ?", agendaID, clinicaID).First(&agenda).Error; err != nil {
+			return err
+		}
+		nome := strings.TrimSpace(agenda.StatusAgendamento.Nome)
+		if nome == "" {
+			var st models.StatusAgendamento
+			if err := tx.Where("id = ?", agenda.StatusAgendamentoID).First(&st).Error; err != nil {
+				return err
+			}
+			nome = strings.TrimSpace(st.Nome)
+		}
+		if !strings.EqualFold(nome, "Realizado") {
+			return errors.New("só é possível liberar cobrança com status Realizado")
+		}
+		now := time.Now()
+		return tx.Model(&models.Agenda{}).Where("id = ? AND clinica_id = ?", agendaID, clinicaID).
+			Update("liberado_cobranca_em", now).Error
+	})
+}
+
+func (r *agendaRepository) AtualizarStatus(clinicaID, id, statusID, usuarioLancamentoID uint, pularReceitaAutomatica bool) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var agenda models.Agenda
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -286,7 +320,23 @@ func (r *agendaRepository) AtualizarStatus(clinicaID, id, statusID, usuarioLanca
 		}
 
 		novoNome := strings.TrimSpace(novoSt.Nome)
+		becomingRealizado := strings.EqualFold(novoNome, "Realizado") && !strings.EqualFold(oldNome, "Realizado")
+		// Com cobrança na recepção ativa, ao concluir a consulta entra na fila de pagamentos sem passo extra de "liberar cobrança".
+		if becomingRealizado && pularReceitaAutomatica {
+			semConvenio := agenda.ConvenioID == nil || *agenda.ConvenioID == 0
+			if semConvenio {
+				now := time.Now()
+				if err := tx.Model(&models.Agenda{}).Where("id = ? AND clinica_id = ? AND liberado_cobranca_em IS NULL", id, clinicaID).
+					Update("liberado_cobranca_em", now).Error; err != nil {
+					return err
+				}
+			}
+		}
+
 		if !strings.EqualFold(novoNome, "Realizado") || strings.EqualFold(oldNome, "Realizado") {
+			return nil
+		}
+		if pularReceitaAutomatica {
 			return nil
 		}
 
@@ -329,6 +379,92 @@ func (r *agendaRepository) BuscarPorIDClinica(id, clinicaID uint) (*models.Agend
 		return nil, err
 	}
 	return &a, nil
+}
+
+func statusImpedeTrocaProfissionalAgenda(nome string) bool {
+	n := strings.ToUpper(strings.TrimSpace(nome))
+	if n == "" {
+		return false
+	}
+	if n == "REALIZADO" || n == "CANCELADO" {
+		return true
+	}
+	if strings.Contains(n, "FALT") {
+		return true
+	}
+	if strings.Contains(n, "ATENDIMENTO") {
+		return true
+	}
+	return false
+}
+
+func papelUsuarioProfissionalAgenda(papel string) bool {
+	p := strings.TrimSpace(strings.ToUpper(papel))
+	return p == rbac.PapelMedico || p == rbac.PapelDono
+}
+
+// AtualizarProfissionalAgenda troca o profissional (médico/dono) mantendo data, paciente e procedimentos.
+func (r *agendaRepository) AtualizarProfissionalAgenda(clinicaID, agendaID, novoUsuarioID uint) error {
+	if novoUsuarioID == 0 {
+		return errors.New("usuario_id inválido")
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var ag models.Agenda
+		if err := tx.Preload("StatusAgendamento").Where("id = ? AND clinica_id = ?", agendaID, clinicaID).First(&ag).Error; err != nil {
+			return err
+		}
+		if ag.StatusAgendamentoID > 0 && statusImpedeTrocaProfissionalAgenda(ag.StatusAgendamento.Nome) {
+			return errors.New("não é possível trocar o profissional neste status do agendamento")
+		}
+		if ag.UsuarioID == novoUsuarioID {
+			return nil
+		}
+
+		var novoProf models.Usuario
+		if err := tx.Preload("TipoUsuario").Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND clinica_id = ?", novoUsuarioID, clinicaID).First(&novoProf).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("profissional não encontrado nesta clínica")
+			}
+			return err
+		}
+		if novoProf.TipoUsuario.Papel == "" || !papelUsuarioProfissionalAgenda(novoProf.TipoUsuario.Papel) {
+			return errors.New("usuário selecionado não é um profissional da agenda (médico ou dono)")
+		}
+
+		duracao := duracaoAgendamentoExistenteTx(tx, ag, clinicaID)
+		if err := validaHorarioNaGradeProfissional(tx, novoUsuarioID, ag.DataHora, duracao); err != nil {
+			return err
+		}
+
+		var bloqueantes []uint
+		_ = tx.Model(&models.StatusAgendamento{}).Where("nome IN ?", []string{"Agendado", "Confirmado", "Em atendimento"}).Pluck("id", &bloqueantes).Error
+		if len(bloqueantes) == 0 {
+			bloqueantes = []uint{1, 2}
+		}
+		loc := ag.DataHora.Location()
+		dayStart := time.Date(ag.DataHora.Year(), ag.DataHora.Month(), ag.DataHora.Day(), 0, 0, 0, 0, loc)
+		dayEnd := dayStart.Add(24 * time.Hour)
+
+		var existentes []models.Agenda
+		if err := tx.Where(
+			"usuario_id = ? AND clinica_id = ? AND data_hora >= ? AND data_hora < ? AND status_agendamento_id IN ? AND id != ?",
+			novoUsuarioID, clinicaID, dayStart, dayEnd, bloqueantes, agendaID,
+		).Find(&existentes).Error; err != nil {
+			return err
+		}
+		newStart := ag.DataHora
+		newEnd := newStart.Add(time.Duration(duracao) * time.Minute)
+		maxSim := maxPacientesEfetivo(novoProf.PermiteSimultaneo, novoProf.MaxPacientes)
+		if n := contarSobreposicoesAgenda(existentes, clinicaID, tx, newStart, newEnd); n >= maxSim {
+			if maxSim <= 1 {
+				return ErrConflitoAgendamento
+			}
+			return ErrCapacidadeAgendaExcedida
+		}
+
+		return tx.Model(&models.Agenda{}).Where("id = ? AND clinica_id = ?", agendaID, clinicaID).Update("usuario_id", novoUsuarioID).Error
+	})
 }
 
 func (r *agendaRepository) StatusIDPorNome(nome string) (uint, error) {
@@ -421,6 +557,8 @@ func (r *agendaRepository) HorariosDisponiveis(usuarioID, clinicaID, procediment
 
 	var disponiveis []time.Time
 	seen := make(map[time.Time]struct{})
+	now := time.Now().In(loc)
+	nowMin := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, loc)
 
 	for _, uh := range usuarioHorarios {
 		inicio, errP := time.Parse("15:04", uh.HorarioInicio)
@@ -448,10 +586,14 @@ func (r *agendaRepository) HorariosDisponiveis(usuarioID, clinicaID, procediment
 			if contarSobreposicoesAgenda(agendas, clinicaID, r.db, h, newEnd) >= maxSim {
 				continue
 			}
+			if slot.Before(nowMin) {
+				continue
+			}
 			seen[slot] = struct{}{}
 			disponiveis = append(disponiveis, h)
 		}
 	}
 
+	sort.Slice(disponiveis, func(i, j int) bool { return disponiveis[i].Before(disponiveis[j]) })
 	return disponiveis, nil
 }

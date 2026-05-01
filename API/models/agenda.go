@@ -22,6 +22,8 @@ type Agenda struct {
 	StatusAgendamentoID uint              `json:"status_id"`
 	StatusAgendamento   StatusAgendamento `gorm:"foreignKey:StatusAgendamentoID"`
 	Observacoes         string            `json:"observacoes"`
+	// LiberadoCobrancaEm: médico/dono libera para a secretaria cobrar no módulo de pagamentos.
+	LiberadoCobrancaEm *time.Time `json:"liberado_cobranca_em,omitempty"`
 	// ProcedimentosExtras complementa ProcedimentoID (múltiplos procedimentos no mesmo horário).
 	ProcedimentosExtras []AgendaProcedimento `gorm:"foreignKey:AgendaID" json:"procedimentos_extras,omitempty"`
 }

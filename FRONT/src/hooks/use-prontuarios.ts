@@ -26,12 +26,17 @@ function mapProntuarioRegistroFromAPI(raw: Record<string, unknown>): ProntuarioR
       editavel = false
     }
   }
+  const prof = (raw.profissional ?? raw.Profissional) as Record<string, unknown> | undefined
+  const nomeProf = prof ? (prof.nome ?? prof.Nome) : undefined
+  const profissional_nome = typeof nomeProf === "string" && nomeProf.trim() ? nomeProf.trim() : undefined
+
   return {
     id: String(id ?? ""),
     paciente_id: String(raw.paciente_id ?? raw.PacienteID ?? ""),
     titulo: String(raw.titulo ?? raw.Titulo ?? ""),
     descricao: typeof conteudo === "string" ? conteudo : "",
     usuario_id: String(raw.profissional_id ?? raw.ProfissionalID ?? raw.usuario_id ?? raw.UsuarioID ?? ""),
+    profissional_nome,
     criado_em: criado,
     atualizado_em: atualizado,
     editavel,

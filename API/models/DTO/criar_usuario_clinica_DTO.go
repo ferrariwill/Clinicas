@@ -1,7 +1,7 @@
 package DTO
 
 type CriarUsuarioClinicaDTO struct {
-	Nome          string  `json:"nome" binding:"required"`
+	Nome          string  `json:"nome" binding:"required,min=2,max=200"`
 	Email         string  `json:"email" binding:"required,email"`
 	Senha         *string `json:"senha" binding:"omitempty,min=6"`
 	TipoUsuarioID uint    `json:"tipo_usuario_id" binding:"required"`

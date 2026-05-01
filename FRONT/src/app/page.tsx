@@ -1,20 +1,16 @@
-"use client"
+import type { Metadata } from "next"
+import { MarketingLanding } from "@/components/marketing-landing"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/hooks/use-auth"
+export const metadata: Metadata = {
+  title: "Facilita Clin — Gestão completa para clínicas",
+  description:
+    "Agenda, prontuário, financeiro e cobrança em uma plataforma multi-clínica. Demonstração comercial e acesso ao sistema.",
+  openGraph: {
+    title: "Facilita Clin",
+    description: "Software de gestão para clínicas e consultórios. Peça uma demonstração ou acesse o sistema.",
+  },
+}
 
-export default function Home() {
-  const router = useRouter()
-  const { isAuthenticated } = useAuth()
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/dashboard")
-    } else {
-      router.push("/login")
-    }
-  }, [isAuthenticated, router])
-
-  return null
+export default function HomePage() {
+  return <MarketingLanding />
 }

@@ -158,8 +158,8 @@ export default function ProntuarioPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Prontuário do Paciente</h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Prontuário do Paciente</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Histórico clínico e evoluções médicas
             </p>
           </div>
@@ -194,6 +194,22 @@ export default function ProntuarioPage() {
                     required
                   />
                 </div>
+
+                {hasPermission(["MEDICO", "DONO", "DONO_CLINICA"]) && (
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                    <p className="text-xs font-medium text-emerald-900">Atalho</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-full border-emerald-200 text-emerald-900 hover:bg-emerald-50 sm:w-auto"
+                      onClick={() => setOpenReceita(true)}
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                      Receituário rápido
+                    </Button>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -234,7 +250,7 @@ export default function ProntuarioPage() {
                 Receituário
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent stackZ="z-[100]" className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogTitle className="uppercase tracking-wide">Receituário</DialogTitle>
               <DialogDescription className="uppercase text-xs tracking-wide text-slate-600">
                 MEDICAMENTO, QUANTIDADE E INTERVALO ENTRE DOSES. O TEXTO SERÁ GRAVADO EM MAIÚSCULAS.
@@ -354,23 +370,39 @@ export default function ProntuarioPage() {
               const isEditing = editingId === prontuario.id
 
               return (
-                <Card key={prontuario.id} className="border-slate-200">
+                <Card key={prontuario.id} className="border-slate-200 dark:border-slate-600">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <CardTitle className="text-lg text-slate-900">
+                        <CardTitle className="text-lg text-slate-900 dark:text-slate-50">
                           {prontuario.titulo}
                         </CardTitle>
-                        <div className="mt-2 flex items-center gap-4 text-sm text-slate-500">
+                        <div className="mt-2 flex flex-col gap-1 text-sm text-slate-500 dark:text-slate-400 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
                           <span>
-                            Data:{" "}
+                            Registrado em:{" "}
                             {format(parseISO(prontuario.criado_em), "dd/MM/yyyy 'às' HH:mm", {
                               locale: ptBR,
                             })}
                           </span>
-                          <span>Profissional: {prontuario.usuario_id}</span>
+                          {prontuario.atualizado_em &&
+                            prontuario.atualizado_em !== prontuario.criado_em &&
+                            !Number.isNaN(parseISO(prontuario.atualizado_em).getTime()) && (
+                              <span>
+                                Última alteração:{" "}
+                                {format(parseISO(prontuario.atualizado_em), "dd/MM/yyyy 'às' HH:mm", {
+                                  locale: ptBR,
+                                })}
+                              </span>
+                            )}
+                          <span className="text-slate-700 dark:text-slate-300">
+                            Profissional:{" "}
+                            <span className="font-medium text-slate-900 dark:text-slate-100">
+                              {prontuario.profissional_nome?.trim() ||
+                                (prontuario.usuario_id ? `Usuário #${prontuario.usuario_id}` : "—")}
+                            </span>
+                          </span>
                           {!editable && (
-                            <span className="inline-flex items-center gap-1 text-amber-600">
+                            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-300">
                               <Lock className="h-3 w-3" />
                               Assinado digitalmente
                             </span>
@@ -382,6 +414,19 @@ export default function ProntuarioPage() {
                         <div className="flex items-center gap-2">
                           {isEditing ? (
                             <>
+                              {hasPermission(["MEDICO", "DONO", "DONO_CLINICA"]) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  type="button"
+                                  className="inline-flex items-center gap-1 border-emerald-200 text-emerald-900"
+                                  onClick={() => setOpenReceita(true)}
+                                  title="Abrir formulário de receituário"
+                                >
+                                  <ClipboardList className="h-3 w-3" />
+                                  Receituário
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 onClick={handleSaveEdit}
@@ -452,17 +497,17 @@ export default function ProntuarioPage() {
                         </Button>
                       </div>
                     )}
-                    <div className="prose prose-sm max-w-none">
+                    <div className="max-w-none">
                       {isEditing ? (
                         <textarea
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
                           rows={8}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                           placeholder="Digite a evolução clínica..."
                         />
                       ) : (
-                        <div className="whitespace-pre-wrap text-slate-700">
+                        <div className="whitespace-pre-wrap text-slate-800 dark:text-slate-200">
                           {prontuario.descricao || "Sem descrição"}
                         </div>
                       )}

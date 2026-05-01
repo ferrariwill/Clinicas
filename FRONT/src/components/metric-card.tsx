@@ -14,20 +14,21 @@ interface MetricCardProps {
   isLoading?: boolean
 }
 
+/** Cartões neutros; só a borda esquerda espessa traz o destaque (menos cor no fundo). */
 const variantStyles = {
-  default: "bg-blue-50 border-blue-200 text-blue-700",
-  success: "bg-green-50 border-green-200 text-green-700",
-  warning: "bg-amber-50 border-amber-200 text-amber-700",
-  danger: "bg-red-50 border-red-200 text-red-700",
-  info: "bg-cyan-50 border-cyan-200 text-cyan-700",
+  default: "bg-white text-slate-800 border-l-slate-400",
+  success: "bg-white text-slate-800 border-l-emerald-500",
+  warning: "bg-white text-slate-800 border-l-amber-500",
+  danger: "bg-white text-slate-800 border-l-red-500",
+  info: "bg-white text-slate-800 border-l-sky-500",
 }
 
 const iconBgStyles = {
-  default: "bg-blue-100 text-blue-600",
-  success: "bg-green-100 text-green-600",
-  warning: "bg-amber-100 text-amber-600",
-  danger: "bg-red-100 text-red-600",
-  info: "bg-cyan-100 text-cyan-600",
+  default: "bg-slate-100 text-slate-600",
+  success: "bg-slate-100 text-emerald-600",
+  warning: "bg-slate-100 text-amber-600",
+  danger: "bg-slate-100 text-red-600",
+  info: "bg-slate-100 text-sky-600",
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({

@@ -2,17 +2,17 @@
 
 import { FormEvent, useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
-import { format, parse, parseISO, formatISO } from "date-fns"
+import { format, parse, parseISO, formatISO, isBefore } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { AgendaResponse, PacienteResponse, ProcedimentoResponse, UsuarioResponse } from "@/types/api"
 import {
   useAgendaDia,
   useCriarAgenda,
   useAtualizarStatusAgenda,
+  useAtualizarProfissionalAgenda,
   usePacientes,
   useProfissionais,
   useProcedimentos,
-  useCriarProcedimento,
   useHorariosDisponiveis,
 } from "@/hooks/use-agenda"
 import { apiClient } from "@/services/api-client"
@@ -30,9 +30,6 @@ import {
   maskPhoneBR,
   maskDataBR,
   dataBRToISO,
-  maskMoedaBRL,
-  parseMoedaBRL,
-  maskMinutosConsulta,
 } from "@/lib/utils/masks"
 import { Plus, RefreshCw, CalendarDays, XCircle, Play, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
@@ -46,6 +43,11 @@ const statusStyles: Record<string, string> = {
   FALTOU: "bg-red-100 text-red-700",
   FALTADO: "bg-red-100 text-red-700",
   FALTA: "bg-red-100 text-red-700",
+}
+
+function podeTrocarMedicoNoCard(status: string) {
+  const u = status.toUpperCase()
+  return u === "AGENDADO" || u === "CONFIRMADO"
 }
 
 function statusLabel(status: string) {
@@ -75,21 +77,23 @@ const emptyNovoPaciente = {
   email: "",
 }
 
-const emptyNovoProc = {
-  nome: "",
-  duracaoMinStr: "30",
-  valorBRL: "",
+function usuarioEhMedicoAgenda(u: { tipo_usuario?: string } | null | undefined): boolean {
+  if (!u?.tipo_usuario) return false
+  const n = u.tipo_usuario
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+  return n.includes("MEDICO")
 }
 
 export default function AgendaPage() {
-  const { usuario } = useAuth()
+  const { usuario, hasPermission } = useAuth()
   const searchParams = useSearchParams()
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [selectedProfessional, setSelectedProfessional] = useState<string>("")
   const [openDialog, setOpenDialog] = useState(false)
   const [pacienteModo, setPacienteModo] = useState<"existente" | "novo">("existente")
   const [novoPaciente, setNovoPaciente] = useState(emptyNovoPaciente)
-  const [novoProc, setNovoProc] = useState(emptyNovoProc)
   const [selectedProcedimentoIds, setSelectedProcedimentoIds] = useState<string[]>([])
   const [formState, setFormState] = useState({
     paciente_id: "",
@@ -113,21 +117,39 @@ export default function AgendaPage() {
     }
   }, [searchParams])
 
+  const isMedicoNaAgenda = useMemo(() => usuarioEhMedicoAgenda(usuario), [usuario])
+
+  useEffect(() => {
+    if (!isMedicoNaAgenda || !usuario?.id) return
+    setSelectedProfessional(usuario.id)
+    setFormState((s) => ({ ...s, usuario_id: usuario.id }))
+  }, [isMedicoNaAgenda, usuario?.id])
+
+  useEffect(() => {
+    if (!openDialog || !isMedicoNaAgenda || !usuario?.id) return
+    setFormState((s) =>
+      s.usuario_id === usuario.id ? s : { ...s, usuario_id: usuario.id, time: "" }
+    )
+  }, [openDialog, isMedicoNaAgenda, usuario?.id])
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const selectedDate = new Date(selectedDay)
   selectedDate.setHours(0, 0, 0, 0)
   /** Ninguém agenda em datas passadas (regra de negócio + bloqueio no front). */
+  /** Só bloqueia criação de novo agendamento; o calendário pode ir a datas passadas para consultar histórico. */
   const isPastDateRestricted = selectedDate < today
+  const podeTrocarProfissionalAgenda = hasPermission(["SECRETARIA", "DONO", "DONO_CLINICA", "ADM_GERAL"])
 
   const dateString = format(selectedDay, "yyyy-MM-dd")
   const profissionaisQuery = useProfissionais()
   const pacientesQuery = usePacientes()
   const procedimentosQuery = useProcedimentos()
-  const agendaQuery = useAgendaDia(dateString, selectedProfessional || undefined)
+  const agendaFiltroProfissional = isMedicoNaAgenda ? usuario?.id : selectedProfessional || undefined
+  const agendaQuery = useAgendaDia(dateString, agendaFiltroProfissional || undefined)
   const criarAgenda = useCriarAgenda()
-  const criarProcedimento = useCriarProcedimento()
   const marcarFalta = useAtualizarStatusAgenda()
+  const trocarProfissional = useAtualizarProfissionalAgenda()
 
   const profissionais = (profissionaisQuery.data ?? []) as UsuarioResponse[]
   const pacientes = (pacientesQuery.data ?? []) as PacienteResponse[]
@@ -172,7 +194,6 @@ export default function AgendaPage() {
     setFormState({ paciente_id: "", usuario_id: "", time: "" })
     setPacienteModo("existente")
     setNovoPaciente(emptyNovoPaciente)
-    setNovoProc(emptyNovoProc)
     setSelectedProcedimentoIds([])
   }
 
@@ -200,10 +221,16 @@ export default function AgendaPage() {
 
     const [yy, mo, da] = dateString.split("-").map(Number)
     const [hh, mi] = formState.time.split(":").map(Number)
-    const data_horario = formatISO(new Date(yy, mo - 1, da, hh, mi, 0, 0))
+    const inicioLocal = new Date(yy, mo - 1, da, hh, mi, 0, 0)
+    const data_horario = formatISO(inicioLocal)
 
     if (isPastDateRestricted) {
       toast.error("Não é permitido criar agendamentos em datas anteriores a hoje.")
+      return
+    }
+    const agora = new Date()
+    if (isBefore(inicioLocal, agora)) {
+      toast.error("Escolha um horário igual ou posterior ao horário atual (não é permitido agendar no passado).")
       return
     }
 
@@ -258,58 +285,46 @@ export default function AgendaPage() {
     marcarFalta.mutate({ agendaId, statusId: "FALTOU" })
   }
 
-  const handleQuickProc = () => {
-    if (!novoProc.nome.trim()) {
-      toast.error("Informe o nome do procedimento")
-      return
-    }
-    const durRaw = parseInt(novoProc.duracaoMinStr.replace(/\D/g, ""), 10)
-    const duracao_minutos = Number.isFinite(durRaw) ? Math.min(999, Math.max(5, durRaw)) : 30
-    const valorParsed = parseMoedaBRL(novoProc.valorBRL)
-    const valor = Number.isFinite(valorParsed) ? Math.max(0, valorParsed) : 0
-    criarProcedimento.mutate(
-      {
-        nome: novoProc.nome.trim(),
-        descricao: "",
-        duracao_minutos,
-        valor,
-      },
-      {
-        onSuccess: () => {
-          setNovoProc(emptyNovoProc)
-        },
-      }
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm text-slate-600 max-w-2xl">
-            Visualize e gerencie os agendamentos do dia. Cadastre paciente e procedimento aqui mesmo quando precisar.
+            Visualize e gerencie os agendamentos do dia. Cadastre paciente aqui quando precisar; procedimentos são mantidos em
+            Procedimentos.
           </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="min-w-[180px]">
-            <label className="block text-sm font-medium text-slate-700">Filtrar por profissional</label>
-            <select
-              value={selectedProfessional}
-              onChange={(event) => setSelectedProfessional(event.target.value)}
-              className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">Todos</option>
-              {profissionais.map((profissional, index) => (
-                <option key={`filtro-prof-${index}-${profissional.id}`} value={profissional.id}>
-                  {profissional.nome}
-                </option>
-              ))}
-            </select>
-            {!profissionaisQuery.isPending && profissionais.length === 0 && (
-              <p className="mt-1 text-xs text-amber-700">
-                Nenhum profissional (Médico ou Dono) encontrado. Cadastre usuários com esses papéis na Equipe.
-              </p>
+            {isMedicoNaAgenda ? (
+              <>
+                <label className="block text-sm font-medium text-slate-700">Sua agenda</label>
+                <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-800">
+                  Exibindo apenas os <strong>seus</strong> agendamentos ({usuario?.nome ?? "médico"}).
+                </p>
+              </>
+            ) : (
+              <>
+                <label className="block text-sm font-medium text-slate-700">Filtrar por profissional</label>
+                <select
+                  value={selectedProfessional}
+                  onChange={(event) => setSelectedProfessional(event.target.value)}
+                  className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">Todos</option>
+                  {profissionais.map((profissional, index) => (
+                    <option key={`filtro-prof-${index}-${profissional.id}`} value={profissional.id}>
+                      {profissional.nome}
+                    </option>
+                  ))}
+                </select>
+                {!profissionaisQuery.isPending && profissionais.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Nenhum profissional (Médico ou Dono) encontrado. Cadastre usuários com esses papéis na Equipe.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -337,7 +352,7 @@ export default function AgendaPage() {
                 <DialogDescription>
                   {searchParams.get("paciente_nome")
                     ? `Paciente sugerido: ${searchParams.get("paciente_nome")}`
-                    : "Fluxo: procedimentos (e cadastro rápido, se precisar), depois paciente, profissional e horário da grade."}
+                    : "Fluxo: procedimentos cadastrados em Procedimentos, depois paciente, profissional e horário da grade."}
                 </DialogDescription>
 
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -352,7 +367,7 @@ export default function AgendaPage() {
                       <p className="text-sm font-medium text-slate-800">1. Procedimentos *</p>
                       {!procedimentosQuery.isPending && procedimentos.length === 0 && (
                         <span className="text-xs text-amber-700">
-                          Nenhum procedimento cadastrado — use o cadastro rápido abaixo.
+                          Nenhum procedimento cadastrado — cadastre em Procedimentos.
                         </span>
                       )}
                     </div>
@@ -389,63 +404,6 @@ export default function AgendaPage() {
                         </p>
                       </div>
                     )}
-                  </div>
-
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-3 space-y-3">
-                    <p className="text-sm font-medium text-slate-800">Cadastro rápido de procedimento</p>
-                    <p className="text-xs text-slate-600">
-                      Preencha o nome, o tempo de atendimento em minutos e o valor cobrado em reais (formato brasileiro).
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1 sm:col-span-2">
-                        <Label htmlFor="qp-nome">Nome do procedimento *</Label>
-                        <Input
-                          id="qp-nome"
-                          placeholder="Ex.: Consulta de retorno"
-                          value={novoProc.nome}
-                          onChange={(e) => setNovoProc((p) => ({ ...p, nome: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="qp-dur">Tempo de atendimento (minutos) *</Label>
-                        <Input
-                          id="qp-dur"
-                          inputMode="numeric"
-                          placeholder="Ex.: 30"
-                          autoComplete="off"
-                          value={novoProc.duracaoMinStr}
-                          onChange={(e) =>
-                            setNovoProc((p) => ({ ...p, duracaoMinStr: maskMinutosConsulta(e.target.value) }))
-                          }
-                        />
-                        <p className="text-xs text-slate-500">Entre 5 e 999 minutos.</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="qp-valor">Valor do atendimento (R$)</Label>
-                        <Input
-                          id="qp-valor"
-                          inputMode="decimal"
-                          placeholder="0,00"
-                          autoComplete="off"
-                          value={novoProc.valorBRL}
-                          onChange={(e) =>
-                            setNovoProc((p) => ({ ...p, valorBRL: maskMoedaBRL(e.target.value) }))
-                          }
-                        />
-                        <p className="text-xs text-slate-500">Digite centavos como no cartão (ex.: 150 = R$ 1,50).</p>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={criarProcedimento.isPending}
-                          onClick={handleQuickProc}
-                        >
-                          {criarProcedimento.isPending ? "Salvando..." : "Salvar e listar procedimento"}
-                        </Button>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
@@ -549,28 +507,37 @@ export default function AgendaPage() {
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="block text-sm font-medium text-slate-700">
-                      3. Profissional *
-                      <select
-                        value={formState.usuario_id}
-                        onChange={(event) =>
-                          setFormState((prev) => ({
-                            ...prev,
-                            usuario_id: event.target.value,
-                            time: "",
-                          }))
-                        }
-                        className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        required
-                      >
-                        <option value="">Selecione</option>
-                        {profissionais.map((profissional, index) => (
-                          <option key={`dialog-prof-${index}-${profissional.id}`} value={profissional.id}>
-                            {profissional.nome} ({profissional.papel || profissional.tipo_usuario})
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {isMedicoNaAgenda ? (
+                      <div className="block text-sm font-medium text-slate-700">
+                        3. Profissional
+                        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-800">
+                          {usuario?.nome ?? "—"} <span className="text-slate-500">(sua agenda)</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="block text-sm font-medium text-slate-700">
+                        3. Profissional *
+                        <select
+                          value={formState.usuario_id}
+                          onChange={(event) =>
+                            setFormState((prev) => ({
+                              ...prev,
+                              usuario_id: event.target.value,
+                              time: "",
+                            }))
+                          }
+                          className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          required
+                        >
+                          <option value="">Selecione</option>
+                          {profissionais.map((profissional, index) => (
+                            <option key={`dialog-prof-${index}-${profissional.id}`} value={profissional.id}>
+                              {profissional.nome} ({profissional.papel || profissional.tipo_usuario})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
 
                     <label className="block text-sm font-medium text-slate-700">
                       Horário (grade, fuso de Brasília) *
@@ -728,9 +695,45 @@ export default function AgendaPage() {
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Profissional</p>
-                          <p className="mt-1 text-sm text-slate-900">{item.usuario_nome || item.usuario_id}</p>
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-800/50">
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                            Profissional
+                          </p>
+                          {podeTrocarProfissionalAgenda && podeTrocarMedicoNoCard(item.status) ? (
+                            <select
+                              className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                              value={item.usuario_id}
+                              disabled={trocarProfissional.isPending}
+                              onChange={(e) => {
+                                const next = e.target.value
+                                if (!next || next === item.usuario_id) return
+                                trocarProfissional.mutate({ agendaId: item.id, usuarioId: next })
+                              }}
+                            >
+                              {(profissionais.some((p) => p.id === item.usuario_id)
+                                ? profissionais
+                                : [
+                                    ...profissionais,
+                                    {
+                                      id: item.usuario_id,
+                                      nome: item.usuario_nome || `Profissional #${item.usuario_id}`,
+                                      email: "",
+                                      tipo_usuario: "",
+                                      clinic_id: "",
+                                      criado_em: "",
+                                    } as UsuarioResponse,
+                                  ]
+                              ).map((prof, i) => (
+                                <option key={`ag-card-prof-${i}-${prof.id}`} value={prof.id}>
+                                  {prof.nome}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                              {item.usuario_nome || item.usuario_id}
+                            </p>
+                          )}
                         </div>
                         <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 sm:col-span-2">
                           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Procedimentos</p>

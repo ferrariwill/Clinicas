@@ -29,7 +29,9 @@ html {
 /* Focus visible for accessibility */
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid #0ea5e9;
   outline-offset: 2px;
 }
@@ -39,4 +41,35 @@ input:focus-visible {
   html {
     font-size: 14px;
   }
+}
+
+/* ── Tema claro único (data-ui-theme=light) ── */
+
+/* Fundo suave tipo “papel”, menos cansativo que branco puro */
+html[data-ui-theme="light"] body {
+  @apply bg-stone-300/85 text-stone-900;
+}
+
+html[data-ui-theme="light"] .app-shell {
+  @apply bg-stone-300/90 text-stone-900;
+}
+
+html[data-ui-theme="light"] aside.border-r.border-gray-200,
+html[data-ui-theme="light"] aside.border-slate-700 {
+  @apply border-stone-400/60;
+}
+
+html[data-ui-theme="light"] .bg-white {
+  @apply bg-stone-100 text-stone-900 border-stone-300/70;
+}
+
+html[data-ui-theme="light"] .bg-gray-50,
+html[data-ui-theme="light"] .bg-slate-50 {
+  @apply bg-stone-200/95 text-stone-900;
+}
+
+html[data-ui-theme="light"] header.bg-white,
+html[data-ui-theme="light"] .border-b.border-gray-200,
+html[data-ui-theme="light"] .border-b.border-slate-200 {
+  @apply border-stone-400/50;
 }

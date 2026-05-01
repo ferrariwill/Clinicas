@@ -125,8 +125,29 @@ export interface AgendaResponse {
   usuario_nome?: string;
   status: string;
   conflito?: boolean;
+  /** ISO: médico liberou para secretaria cobrar (módulo Asaas). */
+  liberado_cobranca_em?: string | null;
   criado_em: string;
   atualizado_em: string;
+}
+
+export type CobrancaConsultaResponse = {
+  id: string;
+  clinica_id: string;
+  agenda_id: string;
+  valor_bruto: number;
+  percentual_split_snapshot: number;
+  taxa_sistema_valor: number;
+  taxa_gateway_valor: number;
+  valor_liquido_clinica: number;
+  status: string;
+  metodo: string;
+  valor_recebido?: number | null;
+  troco?: number | null;
+  asaas_payment_id?: string;
+  pix_copia_e_cola?: string;
+  pix_qr_code_base64?: string;
+  link_pagamento?: string;
 }
 
 export interface HorarioDisponivel {
@@ -173,6 +194,8 @@ export interface ProntuarioRegistroSwagger {
   titulo: string;
   descricao?: string;
   usuario_id: string;
+  /** Nome do profissional que registrou (quando a API envia `profissional`). */
+  profissional_nome?: string;
   data_consulta?: string;
   criado_em: string;
   atualizado_em: string;

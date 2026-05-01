@@ -1,6 +1,8 @@
 package services
 
 import (
+	"errors"
+
 	"github.com/ferrariwill/Clinicas/API/models"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	"github.com/ferrariwill/Clinicas/API/repositories"
@@ -39,13 +41,23 @@ func (s *configuracaoService) BuscarConfiguracao(clinicaID uint) (*dto.Configura
 		TempoAntecedencia:     config.TempoAntecedencia,
 		LimiteAgendamentosDia: config.LimiteAgendamentosDia,
 		PermiteAgendamentoFds: config.PermiteAgendamentoFds,
-		EmailNotificacao:      config.EmailNotificacao,
-		TelefoneWhatsapp:      config.TelefoneWhatsapp,
-		MensagemBoasVindas:    config.MensagemBoasVindas,
+		EmailNotificacao:       config.EmailNotificacao,
+		TelefoneWhatsapp:       config.TelefoneWhatsapp,
+		MensagemBoasVindas:     config.MensagemBoasVindas,
+		UsaCobrancaIntegrada:   config.UsaCobrancaIntegrada,
+		CadastroAsaasAtivo:     config.CadastroAsaasAtivo,
+		PercentualSplitSistema: config.PercentualSplitSistema,
 	}, nil
 }
 
 func (s *configuracaoService) AtualizarConfiguracao(clinicaID uint, req *dto.ConfiguracaoRequest) (*dto.ConfiguracaoResponse, error) {
+	if req.PercentualSplitSistema < 0 || req.PercentualSplitSistema > 100 {
+		return nil, errors.New("percentual_split_sistema deve estar entre 0 e 100")
+	}
+	cadastroAsaas := req.CadastroAsaasAtivo
+	if !req.UsaCobrancaIntegrada {
+		cadastroAsaas = false
+	}
 	config := &models.ClinicaConfiguracao{
 		ClinicaID:             clinicaID,
 		HorarioInicioSemana:   req.HorarioInicioSemana,
@@ -59,9 +71,12 @@ func (s *configuracaoService) AtualizarConfiguracao(clinicaID uint, req *dto.Con
 		TempoAntecedencia:     req.TempoAntecedencia,
 		LimiteAgendamentosDia: req.LimiteAgendamentosDia,
 		PermiteAgendamentoFds: req.PermiteAgendamentoFds,
-		EmailNotificacao:      req.EmailNotificacao,
-		TelefoneWhatsapp:      req.TelefoneWhatsapp,
-		MensagemBoasVindas:    req.MensagemBoasVindas,
+		EmailNotificacao:       req.EmailNotificacao,
+		TelefoneWhatsapp:       req.TelefoneWhatsapp,
+		MensagemBoasVindas:     req.MensagemBoasVindas,
+		UsaCobrancaIntegrada:   req.UsaCobrancaIntegrada,
+		CadastroAsaasAtivo:     cadastroAsaas,
+		PercentualSplitSistema: req.PercentualSplitSistema,
 	}
 
 	err := s.repo.CriarOuAtualizar(config)

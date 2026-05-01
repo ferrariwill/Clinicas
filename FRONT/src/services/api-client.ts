@@ -296,6 +296,57 @@ class ApiClient {
     return response.data;
   }
 
+  async atualizarProfissionalAgenda(agendaId: string, usuarioId: string) {
+    const uid = Number.parseInt(String(usuarioId).trim(), 10)
+    if (!Number.isFinite(uid) || uid <= 0) {
+      throw new Error("Profissional inválido")
+    }
+    const response = await this.axiosInstance.put(`/clinicas/agenda/${agendaId}/profissional`, {
+      usuario_id: uid,
+    })
+    return response.data
+  }
+
+  async liberarCobrancaAgenda(agendaId: string) {
+    const response = await this.axiosInstance.put(`/clinicas/agenda/${agendaId}/liberar-cobranca`, {})
+    return response.data
+  }
+
+  async getCobrancasFila() {
+    const response = await this.axiosInstance.get("/clinicas/cobrancas/fila")
+    return response.data as { fila?: unknown[] }
+  }
+
+  async criarCobranca(
+    agendaId: string,
+    metodo: "PIX" | "CREDIT_CARD" | "DINHEIRO" | "MANUAL",
+    valorRecebido?: number
+  ) {
+    const body: Record<string, unknown> = {
+      agenda_id: Number(agendaId),
+      metodo,
+    }
+    if (valorRecebido != null && Number.isFinite(valorRecebido)) {
+      body.valor_recebido = valorRecebido
+    }
+    const response = await this.axiosInstance.post("/clinicas/cobrancas", body)
+    return response.data as { cobranca?: Record<string, unknown> }
+  }
+
+  async getCobranca(id: string) {
+    const response = await this.axiosInstance.get(`/clinicas/cobrancas/${id}`)
+    return response.data as { cobranca?: Record<string, unknown> }
+  }
+
+  async getRelatorioRecebimentos(inicio?: string, fim?: string, opts?: { incluirSemGateway?: boolean }) {
+    const params: Record<string, string | undefined> = { inicio, fim }
+    if (opts?.incluirSemGateway) {
+      params.incluir_sem_gateway = "1"
+    }
+    const response = await this.axiosInstance.get("/clinicas/cobrancas/relatorio-financeiro", { params })
+    return response.data as { recebimentos?: unknown[] }
+  }
+
   // Medical records endpoints
   async getProntuarios(pacienteId: string) {
     const response = await this.axiosInstance.get("/clinicas/prontuarios", {

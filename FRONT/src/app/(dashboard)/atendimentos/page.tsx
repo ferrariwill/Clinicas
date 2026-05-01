@@ -7,14 +7,20 @@ import { format, parseISO, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/hooks/use-auth"
 import { computeTelasLiberadas, useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
-import { useAgendaDia, usePacientes, useProfissionais, useAtualizarStatusAgenda } from "@/hooks/use-agenda"
+import {
+  useAgendaDia,
+  usePacientes,
+  useProfissionais,
+  useAtualizarStatusAgenda,
+  useLiberarCobrancaAgenda,
+} from "@/hooks/use-agenda"
 import type { AgendaResponse, PacienteResponse } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils/cn"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar } from "@/components/ui/calendar"
 import { MetricCardSkeleton } from "@/components/ui/skeleton"
-import { FileText, RefreshCw, Stethoscope, Play, CheckCircle2 } from "lucide-react"
+import { FileText, RefreshCw, Stethoscope, Play, CheckCircle2, Banknote } from "lucide-react"
 
 function horaAgenda(dataHorario: string) {
   try {
@@ -51,6 +57,7 @@ export default function AtendimentosPage() {
 
   const agendaQuery = useAgendaDia(dateString, usuarioQueryId)
   const atualizarStatus = useAtualizarStatusAgenda()
+  const liberarCobranca = useLiberarCobrancaAgenda()
   const { data: pacientes = [] } = usePacientes()
   const { data: profissionais = [] } = useProfissionais()
 
@@ -201,6 +208,21 @@ export default function AtendimentosPage() {
                             Finalizar consulta
                           </Button>
                         )}
+                        {(a.status || "").toUpperCase() === "REALIZADO" &&
+                          !a.liberado_cobranca_em &&
+                          (isMedico || isDono) && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={liberarCobranca.isPending}
+                              onClick={() => liberarCobranca.mutate(a.id)}
+                              className="gap-2 border-emerald-200 text-emerald-900"
+                            >
+                              <Banknote className="h-4 w-4" />
+                              Liberar cobrança
+                            </Button>
+                          )}
                         <Link
                           href={`/pacientes/${a.paciente_id}/prontuario`}
                           className={cn(

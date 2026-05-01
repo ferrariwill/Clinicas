@@ -8,6 +8,7 @@ import (
 type AssinaturaRepository interface {
 	Criar(assinatura *models.Assinatura) error
 	Atualizar(assinatura *models.Assinatura) error
+	BuscarPorID(id uint) (*models.Assinatura, error)
 	Listar(ativo *bool) ([]models.Assinatura, error)
 	Consultar(clinicaID *uint, planoID *uint) (*[]models.Assinatura, error)
 	Desativar(id int) error
@@ -30,12 +31,20 @@ func (r *assinaturaRepository) Atualizar(assinatura *models.Assinatura) error {
 	return r.db.Save(assinatura).Error
 }
 
+func (r *assinaturaRepository) BuscarPorID(id uint) (*models.Assinatura, error) {
+	var a models.Assinatura
+	if err := r.db.First(&a, id).Error; err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
 func (r *assinaturaRepository) Listar(ativo *bool) ([]models.Assinatura, error) {
 	var assinaturas []models.Assinatura
 	query := r.db.Model(models.Assinatura{})
 
 	if ativo != nil {
-		query = query.Where("ativo = ?", ativo)
+		query = query.Where("ativa = ?", *ativo)
 	}
 
 	err := query.Find(&assinaturas).Error
@@ -56,9 +65,9 @@ func (r *assinaturaRepository) Consultar(clinicaID *uint, planoID *uint) (*[]mod
 }
 
 func (r *assinaturaRepository) Desativar(id int) error {
-	return r.db.Model(&models.Assinatura{}).Where("id = ?", id).Update("ativo", false).Error
+	return r.db.Model(&models.Assinatura{}).Where("id = ?", id).Update("ativa", false).Error
 }
 
 func (r *assinaturaRepository) Reativar(id int) error {
-	return r.db.Model(&models.Assinatura{}).Where("id = ?", id).Update("ativo", true).Error
+	return r.db.Model(&models.Assinatura{}).Where("id = ?", id).Update("ativa", true).Error
 }

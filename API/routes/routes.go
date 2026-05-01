@@ -102,7 +102,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		AllowOriginFunc: func(origin string) bool {
 			return corsIsOriginAllowed(origin, allowedOrigins)
 		},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Clinic-ID"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -147,7 +147,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	procedimentoService := services.NovoProcedimentoService(procedimentoRepo, convenioRepo)
 	convenioService := services.NovoConvenioService(convenioRepo, procedimentoRepo)
 	pacienteService := services.NovoPacienteService(pacienteRepo)
-	agendaService := services.NovaAgendaService(agendaRepo)
+	agendaService := services.NovaAgendaService(agendaRepo, configuracaoRepo)
 	prontuarioService := services.NovoProntuarioService(prontuarioRepo, pacienteRepo)
 	dashboardService := services.NovoDashboardService(dashboardRepo, pacienteRepo, usurioRepo, procedimentoRepo, agendaRepo)
 	lancamentoFinanceiroService := services.NovoLancamentoFinanceiroService(lancamentoFinanceiroRepo)
@@ -169,6 +169,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	convenioController := controllers.NovoConvenioCoontroller(convenioService)
 	pacienteController := controllers.NovoPacienteController(pacienteService)
 	agendaController := controllers.NovaAgendaController(agendaService)
+	cobrancaRepo := repositories.NovaCobrancaRepository(db)
+	cobrancaService := services.NovaCobrancaService(db, cobrancaRepo, agendaRepo, configuracaoRepo, lancamentoFinanceiroRepo, nil)
+	cobrancaController := controllers.NovoCobrancaController(cobrancaService)
+	asaasWebhookController := controllers.NovoAsaasWebhookController(cobrancaService)
 	dashboardController := controllers.NovoDashboardController(dashboardService)
 	financeiroController := controllers.NovoFinanceiroController(permissaoTelaService, auditLogRepo)
 	prontuarioController := controllers.NovoProntuarioController(prontuarioService, auditLogRepo)
@@ -179,6 +183,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		telaService,
 		planoTelaSevice,
 		assinaturaService,
+		usuarioService,
 		auditLogRepo,
 		db)
 
@@ -191,6 +196,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	r.POST("/auth/trocar-clinica", middleware.Autenticado(), controllers.TrocarClinicaHandler(authService))
 	r.POST("/auth/esqueci-senha", controllers.EsqueciSenhaHandler(authService))
 	r.POST("/auth/redefinir-senha", controllers.RedefinirSenhaHandler(authService))
+	r.POST("/webhooks/asaas/pagamentos", asaasWebhookController.Receber)
 
 	//Endpoints do Dashboard
 	dash := r.Group("/dashboard", middleware.Autenticado(), verificarPermissaoTipoUsuario.VerificaPermissaoTipoUsuario)
@@ -256,8 +262,14 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		// Rotas literais antes de /:id para não capturar "agenda", "prontuarios", etc. como id.
 		clinicas.POST("/agenda", agendaController.Criar)
 		clinicas.GET("/agenda", agendaController.Listar)
+		clinicas.PUT("/agenda/:id/profissional", agendaController.AtualizarProfissional)
 		clinicas.PUT("/agenda/:id/status", agendaController.AtualizarStatus)
+		clinicas.PUT("/agenda/:id/liberar-cobranca", agendaController.LiberarCobranca)
 		clinicas.GET("/agenda/horarios-disponiveis", agendaController.HorariosDisponiveis)
+		clinicas.GET("/cobrancas/fila", cobrancaController.Fila)
+		clinicas.GET("/cobrancas/relatorio-financeiro", cobrancaController.RelatorioFinanceiro)
+		clinicas.POST("/cobrancas", cobrancaController.Criar)
+		clinicas.GET("/cobrancas/:id", cobrancaController.Detalhe)
 		clinicas.GET("/prontuarios", prontuarioController.Listar)
 		clinicas.POST("/prontuarios", prontuarioController.Criar)
 		clinicas.PUT("/prontuarios/:id", prontuarioController.Atualizar)
@@ -306,6 +318,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		//Assinaturas
 		admin.POST("/assinaturas", adminController.CriarAssinatura)
 		admin.GET("/assinaturas", adminController.ListarAssinaturas)
+		admin.PATCH("/assinaturas/:id", adminController.AtualizarAssinaturaAdmin)
 		admin.GET("/clinicas/:id/assinatura", adminController.ConsultarAssinaturaClinica)
 
 		//Telas
@@ -329,9 +342,15 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		//Usuarios
 		admin.GET("/usuarios", usuarioController.ListarTodos)
+		admin.POST("/usuarios-plataforma", adminController.CriarUsuarioPlataforma)
+		admin.DELETE("/usuarios/:id", adminController.DesativarUsuarioAdmin)
+		admin.PUT("/usuarios/:id/reativar", adminController.ReativarUsuarioAdmin)
 
 		//Clinicas
 		admin.GET("/clinicas", clinicaController.Listar)
+		admin.GET("/clinicas/:id/configuracoes", clinicaController.BuscarConfiguracoesAdmin)
+		admin.PUT("/clinicas/:id/configuracoes", clinicaController.AtualizarConfiguracoesAdmin)
+		admin.PUT("/clinicas/:id/plano", adminController.AtualizarPlanoClinica)
 
 		//Tipos de Usuário
 		admin.POST("/tipos-usuario", tipoUsuarioController.Criar)

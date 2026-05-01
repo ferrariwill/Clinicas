@@ -8,6 +8,7 @@ import (
 type AssinaturaService interface {
 	Criar(assinatura *models.Assinatura) error
 	Atualizar(assinatura *models.Assinatura) error
+	BuscarPorID(id uint) (*models.Assinatura, error)
 	Listar(ativo *bool) ([]models.Assinatura, error)
 	Consultar(clinicaID *uint, planoID *uint) (*[]models.Assinatura, error)
 	Desativar(id int) error
@@ -28,6 +29,10 @@ func (s *assinaturaService) Criar(assinatura *models.Assinatura) error {
 
 func (s *assinaturaService) Atualizar(assinatura *models.Assinatura) error {
 	return s.repo.Atualizar(assinatura)
+}
+
+func (s *assinaturaService) BuscarPorID(id uint) (*models.Assinatura, error) {
+	return s.repo.BuscarPorID(id)
 }
 
 func (s *assinaturaService) Listar(ativo *bool) ([]models.Assinatura, error) {

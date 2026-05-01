@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/hooks/use-auth"
@@ -17,6 +19,7 @@ import {
   useCriarCustoFixo,
   useAtualizarCustoFixo,
 } from "@/hooks/use-financeiro"
+import { apiClient } from "@/services/api-client"
 import { LancamentoFinanceiro, FiltrosFinanceiro, ResumoFinanceiro, CustoFixo } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -70,11 +73,28 @@ const canViewLancamento = (
   return lancamento.usuario_id === userId
 }
 
+function mapCobrancaMetodo(raw: Record<string, unknown>): { id: string; metodo: string; valor_bruto: number } {
+  return {
+    id: String(raw.id ?? raw.ID ?? ""),
+    metodo: String(raw.metodo ?? raw.Metodo ?? "—").trim() || "—",
+    valor_bruto: Number(raw.valor_bruto ?? raw.ValorBruto ?? 0),
+  }
+}
+
+function labelMetodoCobranca(m: string): string {
+  const u = m.toUpperCase()
+  if (u === "PIX") return "Pix"
+  if (u === "CREDIT_CARD") return "Cartão"
+  if (u === "DINHEIRO") return "Dinheiro"
+  if (u === "MANUAL") return "Recepção / manual"
+  return m
+}
+
 export default function FinanceiroPage() {
   const router = useRouter()
   const { usuario, userRole } = useAuth()
   const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
-  const { podeFinanceiro } = useMemo(
+  const { podeFinanceiro, podeRelatorioRecebimentos } = useMemo(
     () => computeTelasLiberadas(permissoesOk ? permRotas : undefined, userRole),
     [permRotas, userRole, permissoesOk]
   )
@@ -104,6 +124,31 @@ export default function FinanceiroPage() {
   const { data: lancamentos, isLoading: loadingLancamentos } = useLancamentosFinanceiros(filtros)
   const { data: resumo, isLoading: loadingResumo } = useResumoFinanceiro(filtros.dataInicio, filtros.dataFim)
   const { data: custosFixos, isLoading: loadingCustosFixos } = useCustosFixos()
+
+  const cobrancasMetodoQuery = useQuery({
+    queryKey: ["financeiro-cobrancas-metodo", filtros.dataInicio, filtros.dataFim],
+    queryFn: async () => {
+      const d = await apiClient.getRelatorioRecebimentos(filtros.dataInicio, filtros.dataFim, {
+        incluirSemGateway: true,
+      })
+      const raw = (d.recebimentos ?? []) as Record<string, unknown>[]
+      return raw.map(mapCobrancaMetodo)
+    },
+    enabled: permissoesOk && podeRelatorioRecebimentos,
+  })
+
+  const resumoMetodosPagamento = useMemo(() => {
+    const rows = cobrancasMetodoQuery.data ?? []
+    const map = new Map<string, { qtd: number; total: number }>()
+    for (const r of rows) {
+      const cur = map.get(r.metodo) ?? { qtd: 0, total: 0 }
+      cur.qtd += 1
+      cur.total += r.valor_bruto
+      map.set(r.metodo, cur)
+    }
+    const sumTotal = rows.reduce((a, r) => a + r.valor_bruto, 0)
+    return { linhas: Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total), sumTotal, qtd: rows.length }
+  }, [cobrancasMetodoQuery.data])
   const criarLancamento = useCriarLancamento()
   const criarCustoFixo = useCriarCustoFixo()
   const atualizarCustoFixo = useAtualizarCustoFixo()
@@ -614,6 +659,58 @@ export default function FinanceiroPage() {
         </CardContent>
       </Card>
 
+      {podeRelatorioRecebimentos && (
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Consultas pagas por método</CardTitle>
+            <p className="text-sm text-slate-600">
+              Usa o mesmo período dos filtros acima (consultas cobradas e pagas, inclusive dinheiro e baixa na recepção).
+              Ajuda a ver a preferência de pagamento dos pacientes. Detalhe de taxas do Asaas fica em{" "}
+              <Link href="/financeiro/recebimentos" className="font-medium text-sky-700 underline-offset-2 hover:underline">
+                Recebimentos (gateway)
+              </Link>
+              .
+            </p>
+          </CardHeader>
+          <CardContent>
+            {cobrancasMetodoQuery.isPending ? (
+              <MetricCardSkeleton />
+            ) : resumoMetodosPagamento.qtd === 0 ? (
+              <p className="text-sm text-slate-500">Nenhuma consulta paga no período (módulo de cobrança).</p>
+            ) : (
+              <div className="w-full min-w-0 overflow-x-auto rounded-md border border-slate-100">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Método</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">% do valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {resumoMetodosPagamento.linhas.map(([metodo, agg]) => {
+                      const pct =
+                        resumoMetodosPagamento.sumTotal > 0
+                          ? (agg.total / resumoMetodosPagamento.sumTotal) * 100
+                          : 0
+                      return (
+                        <TableRow key={metodo}>
+                          <TableCell className="font-medium">{labelMetodoCobranca(metodo)}</TableCell>
+                          <TableCell className="text-right">{agg.qtd}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{formatCurrency(agg.total)}</TableCell>
+                          <TableCell className="text-right text-slate-600">{pct.toFixed(1)}%</TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {podeVerTudo && (
         <Card className="min-w-0">
           <CardHeader>
@@ -668,7 +765,10 @@ export default function FinanceiroPage() {
       {/* Tabela de Lançamentos */}
       <Card className="min-w-0">
         <CardHeader>
-          <CardTitle>Fluxo de Caixa</CardTitle>
+          <CardTitle>Fluxo de caixa</CardTitle>
+          <p className="text-sm font-normal text-slate-600">
+            Lançamentos manuais e integrações; valores com + (receita) ou − (despesa).
+          </p>
         </CardHeader>
         <CardContent>
           {loadingLancamentos ? (
@@ -695,37 +795,23 @@ export default function FinanceiroPage() {
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Descrição</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Categoria</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lancamentosFiltrados.map((lancamento: LancamentoFinanceiro) => (
                   <TableRow key={lancamento.id}>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-600">
                       {format(parseISO(lancamento.data), "dd/MM/yyyy", { locale: ptBR })}
                     </TableCell>
-                    <TableCell className="font-medium">{lancamento.descricao}</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        lancamento.tipo === 'RECEITA'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {lancamento.tipo === 'RECEITA' ? 'Receita' : 'Despesa'}
+                      <span className="font-medium text-slate-900">{lancamento.descricao}</span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {lancamento.tipo === "RECEITA" ? "Receita" : "Despesa"}
+                        {lancamento.categoria ? ` · ${lancamento.categoria === "PARTICULAR" ? "Particular" : "Convênio"}` : ""}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        lancamento.categoria === 'PARTICULAR'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-purple-100 text-purple-800'
-                      }`}>
-                        {lancamento.categoria === 'PARTICULAR' ? 'Particular' : 'Convênio'}
-                      </span>
-                    </TableCell>
-                    <TableCell className={`text-right font-medium ${
+                    <TableCell className={`text-right font-medium whitespace-nowrap ${
                       lancamento.tipo === 'RECEITA' ? 'text-green-700' : 'text-red-700'
                     }`}>
                       {lancamento.tipo === 'RECEITA' ? '+' : '-'}

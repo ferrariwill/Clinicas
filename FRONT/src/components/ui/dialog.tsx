@@ -14,12 +14,13 @@ const DialogPortal = ({ children, ...props }: DialogPrimitive.DialogPortalProps)
 
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay> & { stackZ?: string }
+>(({ className, stackZ, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      stackZ ?? "z-50",
+      "fixed inset-0 bg-slate-900/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -27,17 +28,21 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  /** z-index acima do modal padrão (ex.: receituário sobre “nova evolução”). */
+  stackZ?: string
+}
+
+const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, DialogContentProps>(
+  ({ className, children, stackZ = "z-50", ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay stackZ={stackZ} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
+        stackZ,
         // Camada full-screen só centraliza; className do consumidor (max-w-*) vai no painel branco.
-        "fixed inset-0 z-50 flex items-center justify-center border-0 bg-transparent p-4 shadow-none outline-none pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        "fixed inset-0 flex items-center justify-center border-0 bg-transparent p-4 shadow-none outline-none pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
       )}
       {...props}
     >
