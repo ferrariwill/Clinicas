@@ -109,6 +109,20 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Verificação de disponibilidade (load balancers, Docker healthcheck, monitoramento). Sem autenticação.
+	r.GET("/health", func(c *gin.Context) {
+		sqlDB, err := db.DB()
+		if err != nil {
+			c.JSON(503, gin.H{"status": "unhealthy", "error": "database: driver"})
+			return
+		}
+		if err := sqlDB.Ping(); err != nil {
+			c.JSON(503, gin.H{"status": "unhealthy", "error": "database: " + err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	validacaoAdm := middleware.AutenticadoAdmin()
 	planoTelaRepo := repositories.NovoPlanoTelaRepository(db)
 	planoTelaSevice := services.NovoPlanoTelaService(planoTelaRepo)
