@@ -60,12 +60,19 @@ class ApiClient {
           });
         }
 
-        // 401: sessão inválida (exceto troca de senha com credencial errada — a API usa 400 nesse caso).
+        // 401: sessão inválida ou credenciais erradas.
+        // Não redirecionar em POST /login (senha errada): a API devolve 401 e o reload apagaria o form e o toast.
         if (status === 401) {
-          const url = error.config?.url ?? "";
-          if (!url.includes("/auth/alterar-senha")) {
+          const url = (error.config?.url ?? "").split("?")[0] ?? "";
+          const method = (error.config?.method ?? "get").toLowerCase();
+          const path = url.includes("://") ? new URL(url).pathname : url;
+          const isFailedCredentialLogin =
+            method === "post" && (path === "/login" || path.endsWith("/login"));
+          if (!url.includes("/auth/alterar-senha") && !isFailedCredentialLogin) {
             Cookies.remove("auth_token");
             Cookies.remove("user_info");
+            Cookies.remove("clinic_id");
+            Cookies.remove("user_role");
             window.location.href = "/login";
           }
         }
