@@ -50,8 +50,9 @@ type Sender struct {
 	Host, Port, User, Password, From string
 }
 
-// FromEnv monta o sender a partir do ambiente. Retorna nil se SMTP_HOST estiver vazio.
-func FromEnv() *Sender {
+// SMTPFromEnv monta o client SMTP a partir do ambiente. Retorna nil se SMTP_HOST estiver vazio.
+// Em PaaS como Render, a saída para smtp.*:465/587 costuma ser bloqueada; use mail.MailerFromEnv com RESEND_API_KEY.
+func SMTPFromEnv() *Sender {
 	host := strings.TrimSpace(os.Getenv("SMTP_HOST"))
 	if host == "" {
 		return nil

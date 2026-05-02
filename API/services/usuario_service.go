@@ -36,10 +36,10 @@ type UsuarioService interface {
 type usuarioService struct {
 	repo    repositories.UsuarioRepository
 	ucRepo  repositories.UsuarioClinicaRepository
-	mailer  *mail.Sender
+	mailer  *mail.Mailer
 }
 
-func NovoUsuarioService(repo repositories.UsuarioRepository, ucRepo repositories.UsuarioClinicaRepository, mailer *mail.Sender) UsuarioService {
+func NovoUsuarioService(repo repositories.UsuarioRepository, ucRepo repositories.UsuarioClinicaRepository, mailer *mail.Mailer) UsuarioService {
 	return &usuarioService{repo: repo, ucRepo: ucRepo, mailer: mailer}
 }
 

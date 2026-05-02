@@ -171,11 +171,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	tipoUsuarioRepo := repositories.NovoTipoUsuarioRepository(db)
 	permissaoTelaRepo := repositories.NovoPermissaoTelaRepository(db)
 
-	smtpSender := mail.FromEnv()
+	mailer := mail.MailerFromEnv()
 
 	//Inicializacao de services
-	authService := services.NovoAuthService(usurioRepo, usuarioClinicaRepo, tipoUsuarioRepo, clinicaRepo, tokenRepo, smtpSender)
-	usuarioService := services.NovoUsuarioService(usurioRepo, usuarioClinicaRepo, smtpSender)
+	authService := services.NovoAuthService(usurioRepo, usuarioClinicaRepo, tipoUsuarioRepo, clinicaRepo, tokenRepo, mailer)
+	usuarioService := services.NovoUsuarioService(usurioRepo, usuarioClinicaRepo, mailer)
 	clinicaService := services.NovoClinicaService(clinicaRepo)
 	telaService := services.NovaTelaService(telaRepo)
 	planoService := services.NovoPlanoService(planoRepo)

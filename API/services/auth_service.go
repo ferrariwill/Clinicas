@@ -48,7 +48,7 @@ type authService struct {
 	tipoUsuario   repositories.TipoUsuarioRepository
 	clinicaRepo   repositories.ClinicaRepository
 	tokenRepo     repositories.TokenRepository
-	mailer        *mail.Sender
+	mailer        *mail.Mailer
 }
 
 func NovoAuthService(
@@ -57,7 +57,7 @@ func NovoAuthService(
 	tipoUsuario repositories.TipoUsuarioRepository,
 	clinicaRepo repositories.ClinicaRepository,
 	token repositories.TokenRepository,
-	mailer *mail.Sender,
+	mailer *mail.Mailer,
 ) AuthService {
 	return &authService{
 		usuarioRepo:   usuarioRepo,
