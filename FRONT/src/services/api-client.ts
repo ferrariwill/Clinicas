@@ -51,8 +51,8 @@ class ApiClient {
           const base = error.config?.baseURL ?? API_BASE_URL;
           const hint =
             `Não foi possível contatar a API em ${base}. ` +
-            `Suba o backend (API na porta 8080 por padrão), confira NEXT_PUBLIC_API_URL no arquivo FRONT/.env.local ` +
-            `e use o mesmo host que você abre no navegador (localhost vs 127.0.0.1).`;
+            `Em dev: suba o backend e confira NEXT_PUBLIC_API_URL em FRONT/.env.local (localhost vs 127.0.0.1). ` +
+            `Em produção: confira se a URL da API está correta no build (Vercel: NEXT_PUBLIC_API_URL) e se o backend aceita o domínio do front em CORS_ORIGINS (use a URL exata ou CORS_ORIGINS=* com a API atual).`;
           return Promise.reject({
             status: 0,
             message: hint,

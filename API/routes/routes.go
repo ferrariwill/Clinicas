@@ -39,6 +39,26 @@ func parseCORSOrigins() []string {
 	return out
 }
 
+// corsWildcardMode indica liberação explícita de qualquer origem http(s) (ecoando o header Origin).
+// Necessário em produção temporária: "CORS_ORIGINS=*" sozinho não é URL válida e era ignorado.
+func corsWildcardMode(allowed []string) bool {
+	for _, a := range allowed {
+		if strings.TrimSpace(a) == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func originIsHTTPOrHTTPS(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	sc := strings.ToLower(u.Scheme)
+	return sc == "http" || sc == "https"
+}
+
 // allCORSOriginsAreLoopback retorna true só quando TODAS as entradas configuradas são http(s) em
 // localhost/127.0.0.1/::1. Nesse caso liberamos qualquer porta no mesmo host (ex.: Docker com
 // FRONT_HOST_PORT=3001 e CORS_ORIGINS=http://localhost:3000). Se existir um domínio público na
@@ -72,6 +92,9 @@ func corsIsOriginAllowed(origin string, allowed []string) bool {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
 		return false
+	}
+	if corsWildcardMode(allowed) && originIsHTTPOrHTTPS(origin) {
+		return true
 	}
 	for _, a := range allowed {
 		if strings.EqualFold(strings.TrimSpace(a), origin) {
