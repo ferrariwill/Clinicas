@@ -12,7 +12,11 @@ import (
 	"github.com/ferrariwill/Clinicas/API/models"
 	"github.com/ferrariwill/Clinicas/API/repositories"
 	"github.com/ferrariwill/Clinicas/API/utils"
+	"gorm.io/gorm"
 )
+
+// ErrCredenciaisInvalidas indica e-mail inexistente ou senha incorreta (mesma mensagem por segurança).
+var ErrCredenciaisInvalidas = errors.New("credenciais inválidas")
 
 type AuthService interface {
 	Login(email string, senha string) (*models.Usuario, error)
@@ -63,11 +67,14 @@ func (s *authService) Login(email string, senha string) (*models.Usuario, error)
 	usuario, err := s.usuarioRepo.BuscarPorEmail(email)
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCredenciaisInvalidas
+		}
 		return nil, err
 	}
 
 	if !utils.VerificarSenha(senha, usuario.Senha) {
-		return nil, errors.New("senha inválida")
+		return nil, ErrCredenciaisInvalidas
 	}
 
 	if err := s.aplicarContextoClinicaNoLogin(usuario); err != nil {

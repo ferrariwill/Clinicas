@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -74,7 +75,11 @@ func LoginHandler(authService services.AuthService) gin.HandlerFunc {
 
 		usuario, err := authService.Login(req.Email, req.Senha)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			if errors.Is(err, services.ErrCredenciaisInvalidas) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao autenticar. Tente novamente."})
 			return
 		}
 
