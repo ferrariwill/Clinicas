@@ -243,7 +243,7 @@ func (s *authService) GerarTokenRedifinicao(email string) error {
 	if base == "" {
 		base = "http://localhost:3000"
 	}
-	subject := "Recuperação de senha — Sistema Clínicas"
+	subject := "Recuperação de senha — Facilita Clin"
 	body := fmt.Sprintf(`Olá, %s.
 
 Foi solicitada uma nova senha para sua conta.

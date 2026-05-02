@@ -258,7 +258,7 @@ func (s *usuarioService) enviarEmailAcessoEquipe(emailCadastro, nome, senhaPlana
 	if base == "" {
 		base = "http://localhost:3000"
 	}
-	subject := "Acesso à equipe — Sistema Clínicas"
+	subject := "Acesso à equipe — Facilita Clin"
 	body := fmt.Sprintf(`Olá, %s.
 
 Sua conta na equipe da clínica foi criada (ou reativada).

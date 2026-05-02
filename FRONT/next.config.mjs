@@ -4,7 +4,10 @@ import nextEnv from "@next/env"
 
 /** Variáveis de SMTP e CONTACT_EMAIL ficam na raiz do monorepo (../.env), sem duplicar no FRONT. */
 const frontDir = path.dirname(fileURLToPath(import.meta.url))
-nextEnv.loadEnvConfig(path.join(frontDir, ".."))
+const monorepoRoot = path.join(frontDir, "..")
+/** Sem o 2º argumento, o Next trata como "production" e o merge pode não bater com `next dev`. */
+const isDev = process.env.NODE_ENV !== "production"
+nextEnv.loadEnvConfig(monorepoRoot, isDev)
 
 const nextConfig = {
   reactStrictMode: true,

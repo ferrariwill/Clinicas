@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
+import { loadMonorepoEnvOnce } from "@/lib/monorepo-env"
 
-/** Destino das mensagens do formulário da landing page. */
 const DEFAULT_CONTACT_EMAIL = "contato@facilitaclin.com.br"
 
 function contactRecipient(): string {
@@ -13,6 +13,8 @@ function contactRecipient(): string {
 }
 
 export async function POST(request: Request) {
+  loadMonorepoEnvOnce()
+
   let raw: unknown
   try {
     raw = await request.json()
@@ -55,24 +57,35 @@ export async function POST(request: Request) {
   }
 
   const to = contactRecipient()
-  let transport
+  const transport = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    ...(port === 587 ? { requireTLS: true } : {}),
+  })
+
+  const text = [
+    `Nome: ${nome}`,
+    `E-mail do lead: ${email}`,
+    `Clínica / empresa: ${clinica || "(não informado)"}`,
+    "",
+    mensagem,
+  ].join("\n")
+
   try {
-    transport = nodemailer.createTransport({ host, port, auth: { user, pass } })
     await transport.sendMail({
       from,
       to,
       replyTo: `${nome} <${email}>`,
       subject: `Contato pelo site — ${clinica || nome}`,
-      text: [
-        `Nome: ${nome}`,
-        `E-mail: ${email}`,
-        `Clínica/consultório: ${clinica || "(não informado)"}`,
-        "",
-        mensagem,
-      ].join("\n"),
+      text,
     })
   } catch {
-    return NextResponse.json({ error: "Falha ao enviar e-mail. Tente mais tarde ou use o link de e-mail na página." }, { status: 502 })
+    return NextResponse.json(
+      { error: "Falha ao enviar e-mail. Verifique SMTP (host/porta/TLS) e credenciais no .env." },
+      { status: 502 },
+    )
   }
 
   return NextResponse.json({ ok: true })

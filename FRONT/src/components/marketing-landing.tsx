@@ -367,8 +367,8 @@ function ContactSection() {
                 {mail}
               </a>
               <p className="text-slate-500">
-                O formulário ao lado envia a mensagem para nossa caixa configurada (<span className="text-slate-600">{mail}</span>).
-                Você também pode clicar no e-mail acima para usar o seu cliente de correio.
+                O formulário envia um e-mail para <span className="font-medium text-slate-700">{mail}</span> com os dados do
+                lead (você pode responder direto ao e-mail dele pelo &quot;Responder&quot; do cliente de correio).
               </p>
             </div>
           </div>
