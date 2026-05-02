@@ -6,7 +6,26 @@ import axios, {
 import Cookies from "js-cookie";
 import { ErrorResponse, ClinicaRequest, PacienteRequest, AgendaRequest, CriarProntuarioRequest, AtualizarProntuarioRequest, ProcedimentoRequest, ConvenioRequest, UsuarioRequest, DefinirHorariosUsuarioRequest, CriarLancamentoRequest, FiltrosFinanceiro, MinhaClinicaAuth } from "@/types/api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+function normalizeApiBaseURL(raw: string): string {
+  return raw.trim().replace(/\/+$/, "");
+}
+
+const API_BASE_URL = normalizeApiBaseURL(
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
+);
+
+const API_TIMEOUT_MS = (() => {
+  const n = Number.parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "", 10);
+  if (Number.isFinite(n) && n >= 5000) return n;
+  return 45000;
+})();
+
+function isLikelyRequestTimeout(error: AxiosError): boolean {
+  const c = error.code;
+  if (c === "ECONNABORTED" || c === "ETIMEDOUT") return true;
+  const msg = (error.message ?? "").toLowerCase();
+  return msg.includes("timeout") || msg.includes("timed out");
+}
 
 class ApiClient {
   private axiosInstance: AxiosInstance;
@@ -14,7 +33,7 @@ class ApiClient {
   constructor() {
     this.axiosInstance = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 10000,
+      timeout: API_TIMEOUT_MS,
       headers: {
         "Content-Type": "application/json",
       },
@@ -46,17 +65,23 @@ class ApiClient {
         const status = error.response?.status;
         const errorData = error.response?.data;
 
-        // Sem resposta HTTP = rede / CORS / backend parado (o browser muitas vezes mostra só "Network Error").
+        // Sem resposta HTTP: timeout (comum no Render “dormindo”), CORS, DNS, TLS ou backend fora.
         if (error.response === undefined) {
           const base = error.config?.baseURL ?? API_BASE_URL;
-          const hint =
+          const timeoutHint =
+            `A API em ${base} não respondeu a tempo (${API_TIMEOUT_MS / 1000}s). ` +
+            `No Render gratuito o primeiro acesso pode levar bem mais que 10s enquanto o serviço “acorda” — espere um minuto e tente de novo, ou defina NEXT_PUBLIC_API_TIMEOUT_MS=90000 no build do front.`;
+          const genericHint =
             `Não foi possível contatar a API em ${base}. ` +
-            `Em dev: suba o backend e confira NEXT_PUBLIC_API_URL em FRONT/.env.local (localhost vs 127.0.0.1). ` +
-            `Em produção: confira se a URL da API está correta no build (Vercel: NEXT_PUBLIC_API_URL) e se o backend aceita o domínio do front em CORS_ORIGINS (use a URL exata ou CORS_ORIGINS=* com a API atual).`;
+            `Abrir ${base}/health na aba do navegador só testa GET na mesma origem; o app (outro domínio) depende de CORS. ` +
+            `Em dev: suba o backend e confira NEXT_PUBLIC_API_URL em FRONT/.env.local. ` +
+            `Em produção: NEXT_PUBLIC_API_URL no Vercel sem barra no final, e CORS_ORIGINS com * ou a URL exata do front.`;
+          const hint = isLikelyRequestTimeout(error) ? timeoutHint : genericHint;
           return Promise.reject({
             status: 0,
             message: hint,
             details: error.message,
+            code: error.code,
           });
         }
 
