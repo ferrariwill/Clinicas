@@ -9,10 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/smtp"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/ferrariwill/Clinicas/API/internal/logger"
+	"github.com/ferrariwill/Clinicas/API/utils"
 )
 
 // ErrSMTPNotConfigured indica variáveis SMTP ausentes.
@@ -50,7 +54,7 @@ func (s *Sender) Send(to, subject, body string) error {
 	if s.From == "" {
 		return fmt.Errorf("%w: SMTP_FROM obrigatório", ErrSMTPNotConfigured)
 	}
-	to = strings.TrimSpace(to)
+	to = utils.NormalizarEmail(to)
 	if to == "" {
 		return errors.New("destinatário vazio")
 	}
@@ -64,8 +68,36 @@ func (s *Sender) Send(to, subject, body string) error {
 		s.From, to, subject)
 	msg := []byte(header + body)
 
+	toDomain := logger.EmailDomain(to)
+	authMode := "none"
+	if strings.TrimSpace(s.User) != "" {
+		authMode = "plain"
+	}
+
 	if port == 465 {
-		return s.sendImplicitTLS(to, msg)
+		logger.L.Info("smtp_send",
+			slog.String("event", "implicit_tls_start"),
+			slog.String("to_domain", toDomain),
+			slog.String("smtp_host", s.Host),
+			slog.String("smtp_port", s.Port),
+			slog.String("auth", authMode),
+		)
+		err := s.sendImplicitTLS(to, msg)
+		if err != nil {
+			logger.L.Error("smtp_send",
+				slog.String("event", "implicit_tls_failed"),
+				slog.String("to_domain", toDomain),
+				slog.String("smtp_host", s.Host),
+				slog.Any("error", err),
+			)
+			return err
+		}
+		logger.L.Info("smtp_send",
+			slog.String("event", "implicit_tls_ok"),
+			slog.String("to_domain", toDomain),
+			slog.String("smtp_host", s.Host),
+		)
+		return nil
 	}
 
 	addr := s.Host + ":" + s.Port
@@ -73,7 +105,28 @@ func (s *Sender) Send(to, subject, body string) error {
 	if s.User != "" {
 		auth = smtp.PlainAuth("", s.User, s.Password, s.Host)
 	}
-	return smtp.SendMail(addr, auth, s.From, []string{to}, msg)
+	logger.L.Info("smtp_send",
+		slog.String("event", "starttls_or_plain_start"),
+		slog.String("to_domain", toDomain),
+		slog.String("smtp_addr", addr),
+		slog.String("auth", authMode),
+	)
+	err = smtp.SendMail(addr, auth, s.From, []string{to}, msg)
+	if err != nil {
+		logger.L.Error("smtp_send",
+			slog.String("event", "send_failed"),
+			slog.String("to_domain", toDomain),
+			slog.String("smtp_addr", addr),
+			slog.Any("error", err),
+		)
+		return err
+	}
+	logger.L.Info("smtp_send",
+		slog.String("event", "send_ok"),
+		slog.String("to_domain", toDomain),
+		slog.String("smtp_addr", addr),
+	)
+	return nil
 }
 
 func (s *Sender) sendImplicitTLS(to string, msg []byte) (err error) {

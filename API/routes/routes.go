@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	_ "github.com/ferrariwill/Clinicas/API/internal/logger"
 
 	"github.com/ferrariwill/Clinicas/API/controllers"
 	"github.com/ferrariwill/Clinicas/API/internal/rbac"

@@ -2,9 +2,11 @@ package controllers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/ferrariwill/Clinicas/API/internal/logger"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	"github.com/ferrariwill/Clinicas/API/models"
 	"github.com/ferrariwill/Clinicas/API/services"
@@ -79,6 +81,12 @@ func LoginHandler(authService services.AuthService) gin.HandlerFunc {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 				return
 			}
+			logger.L.LogAttrs(c.Request.Context(), slog.LevelError, "auth_login",
+				slog.String("event", "erro_interno"),
+				slog.String("request_id", logger.RequestIDFromGin(c)),
+				slog.String("email_domain", logger.EmailDomain(req.Email)),
+				slog.Any("error", err),
+			)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Falha ao autenticar. Tente novamente."})
 			return
 		}
@@ -236,13 +244,29 @@ func EsqueciSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 		err := authService.GerarTokenRedifinicao(req.Email)
 		if err != nil {
 			if errors.Is(err, services.ErrEmailNaoCadastradoRecuperacao) {
+				logger.L.LogAttrs(c.Request.Context(), slog.LevelInfo, "http_esqueci_senha",
+					slog.String("event", "resposta_generica_email_desconhecido"),
+					slog.String("request_id", logger.RequestIDFromGin(c)),
+					slog.String("email_domain", logger.EmailDomain(req.Email)),
+				)
 				c.JSON(http.StatusOK, gin.H{"message": "SE O E-MAIL ESTIVER CADASTRADO, VOCÊ RECEBERÁ UMA SENHA PROVISÓRIA."})
 				return
 			}
+			logger.L.LogAttrs(c.Request.Context(), slog.LevelError, "http_esqueci_senha",
+				slog.String("event", "erro_servico"),
+				slog.String("request_id", logger.RequestIDFromGin(c)),
+				slog.String("email_domain", logger.EmailDomain(req.Email)),
+				slog.Any("error", err),
+			)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
+		logger.L.LogAttrs(c.Request.Context(), slog.LevelInfo, "http_esqueci_senha",
+			slog.String("event", "fluxo_concluido_200"),
+			slog.String("request_id", logger.RequestIDFromGin(c)),
+			slog.String("email_domain", logger.EmailDomain(req.Email)),
+		)
 		c.JSON(http.StatusOK, gin.H{"message": "SE O E-MAIL ESTIVER CADASTRADO, VOCÊ RECEBERÁ UMA SENHA PROVISÓRIA."})
 
 	}

@@ -21,7 +21,7 @@ export default function EsqueciSenhaPage() {
     }
     setPending(true)
     try {
-      await apiClient.esqueciSenha(email.trim())
+      await apiClient.esqueciSenha(email.trim().toLowerCase())
       toast.success(
         "SE O E-MAIL ESTIVER CADASTRADO, VOCÊ RECEBERÁ UMA SENHA PROVISÓRIA. NO PRIMEIRO ACESSO SERÁ OBRIGATÓRIO TROCAR A SENHA."
       )

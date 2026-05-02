@@ -1,13 +1,15 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/ferrariwill/Clinicas/API/internal/logger"
 	"github.com/ferrariwill/Clinicas/API/internal/mail"
 	"github.com/ferrariwill/Clinicas/API/models"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
@@ -248,9 +250,17 @@ func (s *usuarioService) enviarEmailAcessoEquipe(emailCadastro, nome, senhaPlana
 	}
 	if s.mailer == nil {
 		if os.Getenv("LOG_TEMP_PASSWORD") == "true" {
-			log.Printf("[CLÍNICAS] Novo usuário da equipe sem SMTP. E-mail=%s senha provisória=%s", emailCadastro, senhaPlana)
+			logger.L.LogAttrs(context.Background(), slog.LevelWarn, "equipe_email_acesso",
+				slog.String("event", "sem_smtp_senha_no_log_dev"),
+				slog.String("email", emailCadastro),
+				slog.String("senha_provisoria", senhaPlana),
+			)
 		} else {
-			log.Printf("[CLÍNICAS] Novo usuário %s criado sem envio de e-mail (configure SMTP ou LOG_TEMP_PASSWORD=true em dev).", emailCadastro)
+			logger.L.LogAttrs(context.Background(), slog.LevelWarn, "equipe_email_acesso",
+				slog.String("event", "sem_smtp"),
+				slog.String("email_domain", logger.EmailDomain(emailCadastro)),
+				slog.String("hint", "configure SMTP ou LOG_TEMP_PASSWORD=true (só dev)"),
+			)
 		}
 		return false, nil
 	}
@@ -270,8 +280,21 @@ No primeiro acesso será obrigatório definir uma nova senha.
 
 Acesse: %s/login
 `, nome, emailCadastro, senhaPlana, strings.TrimRight(base, "/"))
+	logger.L.LogAttrs(context.Background(), slog.LevelInfo, "equipe_email_acesso",
+		slog.String("event", "smtp_enviar_inicio"),
+		slog.String("email_domain", logger.EmailDomain(emailCadastro)),
+	)
 	if err := s.mailer.Send(emailCadastro, subject, strings.TrimSpace(body)); err != nil {
+		logger.L.LogAttrs(context.Background(), slog.LevelError, "equipe_email_acesso",
+			slog.String("event", "smtp_falhou"),
+			slog.String("email_domain", logger.EmailDomain(emailCadastro)),
+			slog.Any("error", err),
+		)
 		return false, fmt.Errorf("usuário salvo mas falha ao enviar e-mail: %w", err)
 	}
+	logger.L.LogAttrs(context.Background(), slog.LevelInfo, "equipe_email_acesso",
+		slog.String("event", "smtp_ok"),
+		slog.String("email_domain", logger.EmailDomain(emailCadastro)),
+	)
 	return true, nil
 }

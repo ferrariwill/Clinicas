@@ -2,11 +2,13 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"os"
 	_ "time/tzdata" // IANA em binário estático (ex.: Alpine sem pacote tzdata) para America/Sao_Paulo na agenda
 
 	"github.com/ferrariwill/Clinicas/API/database"
 	_ "github.com/ferrariwill/Clinicas/API/docs"
+	"github.com/ferrariwill/Clinicas/API/internal/logger"
 	"github.com/ferrariwill/Clinicas/API/internal/retention"
 	"github.com/ferrariwill/Clinicas/API/routes"
 	"github.com/gin-gonic/gin"
@@ -28,7 +30,10 @@ func main() {
 	// Monorepo: .env costuma ficar na raiz (../.env) quando o cwd é API/; também tenta ./.env
 	if err := godotenv.Load(); err != nil {
 		if err2 := godotenv.Load("../.env"); err2 != nil {
-			log.Println("Arquivo .env não encontrado em ./ nem em ../ (use variáveis de ambiente ou crie .env na raiz ou em API/)")
+			logger.L.Info("env_file",
+				slog.String("event", "dotenv_not_found"),
+				slog.String("detail", "tentou ./ e ../ — use variáveis de ambiente ou .env na raiz ou em API/"),
+			)
 		}
 	}
 
@@ -36,14 +41,16 @@ func main() {
 
 	// Verificar se é para executar apenas migrations
 	if len(os.Args) > 1 && os.Args[1] == "--migrate" {
-		log.Println("Executando migrations...")
+		logger.L.Info("migrations", slog.String("event", "migrate_start"))
 		database.RunMigrations(db)
-		log.Println("Migrations executadas com sucesso!")
+		logger.L.Info("migrations", slog.String("event", "migrate_done"))
 		return
 	}
 
-	r := gin.Default()
+	r := gin.New()
 	r.HandleMethodNotAllowed = false
+	r.Use(logger.GinMiddlewareRecovery())
+	r.Use(logger.GinMiddlewareAccessLog())
 
 	// Swagger endpoint
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -56,8 +63,14 @@ func main() {
 		port = "8080"
 	}
 
-	log.Println("Servidor iniciado na porta", port)
-	log.Println("Swagger disponível em: http://localhost:" + port + "/swagger/index.html")
-	r.Run(":" + port)
+	logger.L.Info("server_start",
+		slog.String("event", "listening"),
+		slog.String("port", port),
+		slog.String("swagger_url", "http://localhost:"+port+"/swagger/index.html"),
+	)
+	if err := r.Run(":" + port); err != nil {
+		logger.L.Error("server_exit", slog.String("event", "run_failed"), slog.Any("error", err))
+		log.Fatal(err)
+	}
 
 }

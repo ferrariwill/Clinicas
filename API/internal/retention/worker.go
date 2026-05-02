@@ -1,12 +1,14 @@
 package retention
 
 import (
-	"log"
+	"context"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ferrariwill/Clinicas/API/internal/logger"
 	"github.com/ferrariwill/Clinicas/API/models"
 	"gorm.io/gorm"
 )
@@ -43,7 +45,10 @@ func StartWorker(db *gorm.DB) {
 
 	if runOnStart {
 		if _, err := RunNow(db); err != nil {
-			log.Printf("retention worker: erro na execução inicial: %v", err)
+			logger.L.LogAttrs(context.Background(), slog.LevelError, "retention_worker",
+				slog.String("event", "run_initial_failed"),
+				slog.Any("error", err),
+			)
 		}
 	}
 
@@ -52,11 +57,18 @@ func StartWorker(db *gorm.DB) {
 		defer ticker.Stop()
 		for range ticker.C {
 			if _, err := RunNow(db); err != nil {
-				log.Printf("retention worker: erro na execução agendada: %v", err)
+				logger.L.LogAttrs(context.Background(), slog.LevelError, "retention_worker",
+					slog.String("event", "run_scheduled_failed"),
+					slog.Any("error", err),
+				)
 			}
 		}
 	}()
-	log.Printf("retention worker iniciado (intervalo=%d dias, run_on_start=%v)", intervalDays, runOnStart)
+	logger.L.LogAttrs(context.Background(), slog.LevelInfo, "retention_worker",
+		slog.String("event", "started"),
+		slog.Int("interval_days", intervalDays),
+		slog.Bool("run_on_start", runOnStart),
+	)
 }
 
 // RunNow executa o ciclo de retenção sob demanda.
@@ -73,7 +85,11 @@ func RunNow(db *gorm.DB) (RunReport, error) {
 		return report, resAudit.Error
 	} else if resAudit.RowsAffected > 0 {
 		report.AuditLogsDeleted = resAudit.RowsAffected
-		log.Printf("retention worker: audit_logs removidos=%d (cutoff=%s)", resAudit.RowsAffected, cutoffAudit.Format("2006-01-02"))
+		logger.L.LogAttrs(context.Background(), slog.LevelInfo, "retention_worker",
+			slog.String("event", "audit_logs_deleted"),
+			slog.Int64("rows", resAudit.RowsAffected),
+			slog.String("cutoff", cutoffAudit.Format("2006-01-02")),
+		)
 	}
 
 	exists, err := tableExists(db, "pacientes_deletados")
@@ -90,7 +106,11 @@ func RunNow(db *gorm.DB) (RunReport, error) {
 	}
 	if resPac.RowsAffected > 0 {
 		report.PacientesDeletadosDeleted = resPac.RowsAffected
-		log.Printf("retention worker: pacientes_deletados removidos=%d (cutoff=%s)", resPac.RowsAffected, cutoffPacientesDeletados.Format("2006-01-02"))
+		logger.L.LogAttrs(context.Background(), slog.LevelInfo, "retention_worker",
+			slog.String("event", "pacientes_deletados_deleted"),
+			slog.Int64("rows", resPac.RowsAffected),
+			slog.String("cutoff", cutoffPacientesDeletados.Format("2006-01-02")),
+		)
 	}
 	return report, nil
 }
