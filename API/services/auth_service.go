@@ -18,6 +18,9 @@ import (
 // ErrCredenciaisInvalidas indica e-mail inexistente ou senha incorreta (mesma mensagem por segurança).
 var ErrCredenciaisInvalidas = errors.New("credenciais inválidas")
 
+// ErrEmailNaoCadastradoRecuperacao indica e-mail inexistente em "esqueci minha senha" (resposta genérica ao cliente).
+var ErrEmailNaoCadastradoRecuperacao = errors.New("email não encontrado")
+
 type AuthService interface {
 	Login(email string, senha string) (*models.Usuario, error)
 	AlterarSenha(usuarioID uint, senhaAtual string, novaSenha string) error
@@ -225,7 +228,10 @@ func (s *authService) AlterarSenha(usuarioId uint, senhaAtual string, novaSenha 
 func (s *authService) GerarTokenRedifinicao(email string) error {
 	usuario, err := s.usuarioRepo.BuscarPorEmail(email)
 	if err != nil {
-		return errors.New("email não encontrado")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrEmailNaoCadastradoRecuperacao
+		}
+		return fmt.Errorf("consultar usuário: %w", err)
 	}
 
 	plain := utils.SenhaAleatoria(14)
@@ -233,6 +239,10 @@ func (s *authService) GerarTokenRedifinicao(email string) error {
 	if err != nil {
 		return err
 	}
+
+	senhaAnterior := usuario.Senha
+	obrigarAnterior := usuario.ObrigarTrocaSenha
+
 	if err := s.usuarioRepo.DefinirSenhaEFlagTroca(usuario.ID, hash, true); err != nil {
 		return err
 	}
@@ -264,6 +274,9 @@ Link: %s/login
 `, usuario.Nome, usuario.Email, plain, strings.TrimRight(base, "/"))
 
 	if err := s.mailer.Send(usuario.Email, subject, strings.TrimSpace(body)); err != nil {
+		if rbErr := s.usuarioRepo.DefinirSenhaEFlagTroca(usuario.ID, senhaAnterior, obrigarAnterior); rbErr != nil {
+			log.Printf("[CLÍNICAS] CRÍTICO: falha ao reverter senha após erro de SMTP (usuário %d): %v", usuario.ID, rbErr)
+		}
 		return fmt.Errorf("erro ao enviar e-mail: %w", err)
 	}
 	return nil

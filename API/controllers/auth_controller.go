@@ -235,12 +235,11 @@ func EsqueciSenhaHandler(authService services.AuthService) gin.HandlerFunc {
 
 		err := authService.GerarTokenRedifinicao(req.Email)
 		if err != nil {
-			low := strings.ToLower(err.Error())
-			if strings.Contains(low, "não encontrado") || strings.Contains(low, "nao encontrado") {
+			if errors.Is(err, services.ErrEmailNaoCadastradoRecuperacao) {
 				c.JSON(http.StatusOK, gin.H{"message": "SE O E-MAIL ESTIVER CADASTRADO, VOCÊ RECEBERÁ UMA SENHA PROVISÓRIA."})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": strings.ToUpper(err.Error())})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
