@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ type CobrancaService interface {
 	CriarCobranca(clinicaID, usuarioID uint, agendaID uint, metodo string, valorRecebido *float64) (*models.CobrancaConsulta, error)
 	BuscarCobranca(clinicaID, cobrancaID uint) (*models.CobrancaConsulta, error)
 	RelatorioFinanceiro(clinicaID uint, inicio, fim *time.Time, incluirSemGateway bool) ([]models.CobrancaConsulta, error)
+	RelatorioRepasseProfissionais(clinicaID uint, inicio, fim *time.Time, incluirSemGateway bool) ([]models.RelatorioRepasseProfissionalLinha, []models.RelatorioRepasseProfissionalDetalhe, error)
 	ProcessarWebhookAsaas(body []byte) error
 }
 
@@ -125,6 +127,85 @@ func (s *cobrancaService) BuscarCobranca(clinicaID, cobrancaID uint) (*models.Co
 func (s *cobrancaService) RelatorioFinanceiro(clinicaID uint, inicio, fim *time.Time, incluirSemGateway bool) ([]models.CobrancaConsulta, error) {
 	apenasGateway := !incluirSemGateway
 	return s.cobRepo.ListarRelatorioPagas(clinicaID, inicio, fim, apenasGateway)
+}
+
+func (s *cobrancaService) RelatorioRepasseProfissionais(clinicaID uint, inicio, fim *time.Time, incluirSemGateway bool) ([]models.RelatorioRepasseProfissionalLinha, []models.RelatorioRepasseProfissionalDetalhe, error) {
+	apenasGateway := !incluirSemGateway
+	rows, err := s.cobRepo.ListarRelatorioPagas(clinicaID, inicio, fim, apenasGateway)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	type agg struct {
+		nome, esp string
+		pct       float64
+		qtd       int
+		base      float64
+		rep       float64
+	}
+	byProf := make(map[uint]*agg)
+	detalhes := make([]models.RelatorioRepasseProfissionalDetalhe, 0, len(rows))
+
+	for i := range rows {
+		c := &rows[i]
+		uid := c.Agenda.UsuarioID
+		pct := NormalizarPorcentagemRepasse(c.Agenda.Usuario.PorcentagemRepasse)
+		base := c.ValorBruto
+		rep := round2(base * pct / 100.0)
+
+		a, ok := byProf[uid]
+		if !ok {
+			nome := strings.TrimSpace(c.Agenda.Usuario.Nome)
+			if nome == "" {
+				nome = "Profissional"
+			}
+			a = &agg{
+				nome: nome,
+				esp:  strings.TrimSpace(c.Agenda.Usuario.Especialidade),
+				pct:  pct,
+			}
+			byProf[uid] = a
+		}
+		a.qtd++
+		a.base += base
+		a.rep += rep
+
+		pac := strings.TrimSpace(c.Agenda.Paciente.Nome)
+		dh := c.Agenda.DataHora.In(utils.LocSaoPaulo()).Format(time.RFC3339)
+		detalhes = append(detalhes, models.RelatorioRepasseProfissionalDetalhe{
+			CobrancaID:         c.ID,
+			AgendaID:           c.AgendaID,
+			UsuarioID:          uid,
+			DataHora:           dh,
+			PacienteNome:       pac,
+			ValorBase:          base,
+			PorcentagemRepasse: pct,
+			ValorRepasse:       rep,
+		})
+	}
+
+	ids := make([]uint, 0, len(byProf))
+	for id := range byProf {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return byProf[ids[i]].nome < byProf[ids[j]].nome
+	})
+
+	linhas := make([]models.RelatorioRepasseProfissionalLinha, 0, len(ids))
+	for _, id := range ids {
+		a := byProf[id]
+		linhas = append(linhas, models.RelatorioRepasseProfissionalLinha{
+			UsuarioID:              id,
+			Nome:                   a.nome,
+			Especialidade:          a.esp,
+			PorcentagemRepasse:     a.pct,
+			QuantidadeAtendimentos: a.qtd,
+			ValorBaseTotal:         round2(a.base),
+			ValorRepasseTotal:      round2(a.rep),
+		})
+	}
+	return linhas, detalhes, nil
 }
 
 func (s *cobrancaService) CriarCobranca(clinicaID, usuarioID uint, agendaID uint, metodo string, valorRecebido *float64) (*models.CobrancaConsulta, error) {

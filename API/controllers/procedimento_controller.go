@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"net/http"
+	"strings"
 
+	"github.com/ferrariwill/Clinicas/API/internal/especialidade"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	servicedto "github.com/ferrariwill/Clinicas/API/models/DTO/ServiceDTO"
@@ -120,7 +122,15 @@ func (c *ProcedimentoController) BuscarPorClinica(ctx *gin.Context) {
 		filtro = &val
 	}
 
-	procedimentos, err := c.service.BuscarPorClinica(clinicaID, filtro)
+	var filtroEsp *string
+	if raw := strings.TrimSpace(ctx.Query("especialidade")); raw != "" {
+		n := especialidade.Normalizar(raw)
+		if especialidade.Valida(n) {
+			filtroEsp = &n
+		}
+	}
+
+	procedimentos, err := c.service.BuscarPorClinica(clinicaID, filtro, filtroEsp)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"erro": err.Error(),

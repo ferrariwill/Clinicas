@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/services/api-client"
 import { toast } from "sonner"
-import type { MetricasOperacionaisSwagger, ResumoFinanceiro } from "@/types/api"
+import type { MedicoDashboardClinicoResponse, MetricasOperacionaisSwagger, ResumoFinanceiro } from "@/types/api"
 
 export type MetricasOperacionais = MetricasOperacionaisSwagger
 
@@ -114,6 +114,25 @@ export const useEstatisticas = (clinicaId?: string) => {
       }
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: 1,
+  })
+}
+
+export const useMedicoDashboardClinico = (opts: {
+  semanas?: number
+  clinicaId?: string
+  enabled?: boolean
+}) => {
+  const semanas = opts.semanas ?? 12
+  const enabled = opts.enabled !== false
+  return useQuery({
+    queryKey: ["medico-dashboard-clinico", semanas, opts.clinicaId],
+    enabled,
+    queryFn: async () => {
+      const raw = await apiClient.getMedicoDashboardClinico(semanas, opts.clinicaId)
+      return raw as MedicoDashboardClinicoResponse
+    },
+    staleTime: 2 * 60 * 1000,
     retry: 1,
   })
 }

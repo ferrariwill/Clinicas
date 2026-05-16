@@ -73,21 +73,23 @@ type PacienteResponse struct {
 
 // ProcedimentoRequest representa a requisição para criar procedimento
 type ProcedimentoRequest struct {
-	Nome      string  `json:"nome" binding:"required" example:"Consulta Médica"`
-	Descricao string  `json:"descricao" example:"Consulta médica geral"`
-	Valor     float64 `json:"valor" binding:"required" example:"150.00"`
-	Duracao   int     `json:"duracao" example:"30"`
+	Nome          string  `json:"nome" binding:"required" example:"Consulta Médica"`
+	Descricao     string  `json:"descricao" example:"Consulta médica geral"`
+	Valor         float64 `json:"valor" binding:"required" example:"150.00"`
+	Duracao       int     `json:"duracao" example:"30"`
+	Especialidade string  `json:"especialidade" example:"MEDICO"`
 }
 
 // ProcedimentoResponse representa a resposta de procedimento para Swagger
 type ProcedimentoResponse struct {
-	ID        uint    `json:"id" example:"1"`
-	Nome      string  `json:"nome" example:"Consulta Médica"`
-	Descricao string  `json:"descricao" example:"Consulta médica geral"`
-	Valor     float64 `json:"valor" example:"150.00"`
-	Duracao   int     `json:"duracao" example:"30"`
-	Ativo     bool    `json:"ativo" example:"true"`
-	ClinicaID uint    `json:"clinica_id" example:"1"`
+	ID            uint    `json:"id" example:"1"`
+	Nome          string  `json:"nome" example:"Consulta Médica"`
+	Descricao     string  `json:"descricao" example:"Consulta médica geral"`
+	Valor         float64 `json:"valor" example:"150.00"`
+	Duracao       int     `json:"duracao" example:"30"`
+	Especialidade string  `json:"especialidade" example:"MEDICO"`
+	Ativo         bool    `json:"ativo" example:"true"`
+	ClinicaID     uint    `json:"clinica_id" example:"1"`
 }
 
 // AgendaRequest representa a requisição para criar agendamento
@@ -210,7 +212,7 @@ type ConfiguracaoResponse struct {
 
 // UsuarioHorarioRequest representa a requisição para definir horários do usuário
 type UsuarioHorarioRequest struct {
-	DiaSemana     int    `json:"dia_semana" binding:"required,min=0,max=6" example:"1"`
+	DiaSemana     int    `json:"dia_semana" binding:"gte=0,lte=6" example:"1"`
 	HorarioInicio string `json:"horario_inicio" binding:"required" example:"08:00"`
 	HorarioFim    string `json:"horario_fim" binding:"required" example:"18:00"`
 	Ativo         bool   `json:"ativo" example:"true"`

@@ -139,7 +139,49 @@ func TestFluxoPrincipalMedico(t *testing.T) {
 	token := login(t, r, emailMedico, "SenhaIntegracao!1")
 	auth := "Bearer " + token
 
-	// 1) Primeiro agendamento
+	// Médico não cria agendamento (403)
+	bodyMed := map[string]any{
+		"paciente_id":     p1.ID,
+		"usuario_id":      medico.ID,
+		"procedimento_id": proc.ID,
+		"data_hora":       slot.Format(time.RFC3339Nano),
+		"status_id":       statusAgendado.ID,
+		"observacoes":     "tentativa médico",
+	}
+	resMed := postJSON(t, r, "POST", "/clinicas/agenda", bodyMed, auth)
+	if resMed.Code != http.StatusForbidden {
+		t.Fatalf("médico criando agenda: esperado 403, obteve %d: %s", resMed.Code, resMed.Body.String())
+	}
+
+	tipoSecretaria := models.TipoUsuario{
+		Nome:      "Secretária Integração " + sufixo,
+		Descricao: "Papel secretaria para teste",
+		Papel:     rbac.PapelSecretaria,
+		ClinicaID: clinica.ID,
+	}
+	if err := db.Create(&tipoSecretaria).Error; err != nil {
+		t.Fatalf("criar tipo secretária: %v", err)
+	}
+	t.Cleanup(func() { db.Unscoped().Delete(&tipoSecretaria) })
+
+	emailSec := fmt.Sprintf("secretaria.integration.%s@test.local", sufixo)
+	secretaria := models.Usuario{
+		Nome:          "Sec. Integração",
+		Email:         emailSec,
+		Senha:         hash,
+		Ativo:         true,
+		ClinicaID:     clinica.ID,
+		TipoUsuarioID: tipoSecretaria.ID,
+	}
+	if err := db.Create(&secretaria).Error; err != nil {
+		t.Fatalf("criar usuário secretária: %v", err)
+	}
+	t.Cleanup(func() { db.Unscoped().Delete(&secretaria) })
+
+	tokenSec := login(t, r, emailSec, "SenhaIntegracao!1")
+	authSec := "Bearer " + tokenSec
+
+	// 1) Primeiro agendamento (secretaria)
 	body1 := map[string]any{
 		"paciente_id":     p1.ID,
 		"usuario_id":      medico.ID,
@@ -148,7 +190,7 @@ func TestFluxoPrincipalMedico(t *testing.T) {
 		"status_id":       statusAgendado.ID,
 		"observacoes":     "primeiro",
 	}
-	res1 := postJSON(t, r, "POST", "/clinicas/agenda", body1, auth)
+	res1 := postJSON(t, r, "POST", "/clinicas/agenda", body1, authSec)
 	if res1.Code != http.StatusCreated {
 		t.Fatalf("primeiro agendamento: esperado 201, obteve %d: %s", res1.Code, res1.Body.String())
 	}
@@ -162,7 +204,7 @@ func TestFluxoPrincipalMedico(t *testing.T) {
 		"status_id":       statusAgendado.ID,
 		"observacoes":     "conflito",
 	}
-	res2 := postJSON(t, r, "POST", "/clinicas/agenda", body2, auth)
+	res2 := postJSON(t, r, "POST", "/clinicas/agenda", body2, authSec)
 	if res2.Code != http.StatusConflict {
 		t.Fatalf("agendamento conflitante: esperado 409, obteve %d: %s", res2.Code, res2.Body.String())
 	}

@@ -38,21 +38,23 @@ func (cc *CustoFixoController) Listar(c *gin.Context) {
 	out := make([]gin.H, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, gin.H{
-			"id":            strconv.FormatUint(uint64(row.ID), 10),
-			"descricao":     row.Descricao,
-			"valor_mensal":  row.ValorMensal,
-			"ativo":         row.Ativo,
-			"clinica_id":    strconv.FormatUint(uint64(row.ClinicaID), 10),
-			"criado_em":     row.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			"atualizado_em": row.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			"id":                       strconv.FormatUint(uint64(row.ID), 10),
+			"descricao":                row.Descricao,
+			"valor_mensal":             row.ValorMensal,
+			"ativo":                    row.Ativo,
+			"dia_previsto_pagamento":   row.DiaPrevistoPagamento,
+			"clinica_id":               strconv.FormatUint(uint64(row.ClinicaID), 10),
+			"criado_em":                row.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			"atualizado_em":            row.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"custos_fixos": out})
 }
 
 type criarCustoFixoBody struct {
-	Descricao   string  `json:"descricao"`
-	ValorMensal float64 `json:"valor_mensal"`
+	Descricao              string  `json:"descricao"`
+	ValorMensal            float64 `json:"valor_mensal"`
+	DiaPrevistoPagamento   *int    `json:"dia_previsto_pagamento"`
 }
 
 // Criar POST /clinicas/custos-fixos
@@ -68,23 +70,29 @@ func (cc *CustoFixoController) Criar(c *gin.Context) {
 		return
 	}
 	body.Descricao = strings.TrimSpace(body.Descricao)
-	row, err := cc.svc.Criar(clinicaID, body.Descricao, body.ValorMensal)
+	dia := 1
+	if body.DiaPrevistoPagamento != nil {
+		dia = *body.DiaPrevistoPagamento
+	}
+	row, err := cc.svc.Criar(clinicaID, body.Descricao, body.ValorMensal, dia)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{
-		"id":           strconv.FormatUint(uint64(row.ID), 10),
-		"descricao":    row.Descricao,
-		"valor_mensal": row.ValorMensal,
-		"ativo":        row.Ativo,
+		"id":                       strconv.FormatUint(uint64(row.ID), 10),
+		"descricao":                row.Descricao,
+		"valor_mensal":             row.ValorMensal,
+		"ativo":                    row.Ativo,
+		"dia_previsto_pagamento":   row.DiaPrevistoPagamento,
 	})
 }
 
 type atualizarCustoFixoBody struct {
-	Descricao   string  `json:"descricao"`
-	ValorMensal float64 `json:"valor_mensal"`
-	Ativo       *bool   `json:"ativo"`
+	Descricao              string  `json:"descricao"`
+	ValorMensal            float64 `json:"valor_mensal"`
+	Ativo                  *bool   `json:"ativo"`
+	DiaPrevistoPagamento   *int    `json:"dia_previsto_pagamento"`
 }
 
 // Atualizar PUT /clinicas/custos-fixos/:id
@@ -109,15 +117,16 @@ func (cc *CustoFixoController) Atualizar(c *gin.Context) {
 	if body.Ativo != nil {
 		ativo = *body.Ativo
 	}
-	row, err := cc.svc.Atualizar(clinicaID, uint(id64), body.Descricao, body.ValorMensal, ativo)
+	row, err := cc.svc.Atualizar(clinicaID, uint(id64), body.Descricao, body.ValorMensal, ativo, body.DiaPrevistoPagamento)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":           strconv.FormatUint(uint64(row.ID), 10),
-		"descricao":    row.Descricao,
-		"valor_mensal": row.ValorMensal,
-		"ativo":        row.Ativo,
+		"id":                       strconv.FormatUint(uint64(row.ID), 10),
+		"descricao":                row.Descricao,
+		"valor_mensal":             row.ValorMensal,
+		"ativo":                    row.Ativo,
+		"dia_previsto_pagamento":   row.DiaPrevistoPagamento,
 	})
 }

@@ -2,9 +2,15 @@
 
 import { FormEvent, useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
-import { format, parse, parseISO, formatISO, isBefore } from "date-fns"
+import { format, parse, parseISO, formatISO, isBefore, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { AgendaResponse, PacienteResponse, ProcedimentoResponse, UsuarioResponse } from "@/types/api"
+import {
+  AgendaResponse,
+  PacienteResponse,
+  PreviewAgendaLoteSessao,
+  ProcedimentoResponse,
+  UsuarioResponse,
+} from "@/types/api"
 import {
   useAgendaDia,
   useCriarAgenda,
@@ -14,12 +20,22 @@ import {
   useProfissionais,
   useProcedimentos,
   useHorariosDisponiveis,
+  useCriarAgendaLote,
 } from "@/hooks/use-agenda"
 import { apiClient } from "@/services/api-client"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+  ModalActions,
+  ModalButton,
+  modalIconProps,
+} from "@/components/ui/dialog"
 import { Calendar } from "@/components/ui/calendar"
 import { MetricCardSkeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
@@ -77,6 +93,23 @@ const emptyNovoPaciente = {
   email: "",
 }
 
+const DIAS_SEMANA_LOTE: { valor: number; label: string }[] = [
+  { valor: 0, label: "Dom" },
+  { valor: 1, label: "Seg" },
+  { valor: 2, label: "Ter" },
+  { valor: 3, label: "Qua" },
+  { valor: 4, label: "Qui" },
+  { valor: 5, label: "Sex" },
+  { valor: 6, label: "Sáb" },
+]
+
+/** Referências estáveis — `data ?? []` inline recria array a cada render e dispara useEffect em loop. */
+const EMPTY_USUARIOS: UsuarioResponse[] = []
+const EMPTY_PACIENTES: PacienteResponse[] = []
+const EMPTY_PROCEDIMENTOS: ProcedimentoResponse[] = []
+const EMPTY_AGENDAMENTOS: AgendaResponse[] = []
+const EMPTY_HORARIOS: string[] = []
+
 function usuarioEhMedicoAgenda(u: { tipo_usuario?: string } | null | undefined): boolean {
   if (!u?.tipo_usuario) return false
   const n = u.tipo_usuario
@@ -100,6 +133,13 @@ export default function AgendaPage() {
     usuario_id: "",
     time: "",
   })
+  const [modoAgenda, setModoAgenda] = useState<"unico" | "lote">("unico")
+  const [loteQuantidade, setLoteQuantidade] = useState(10)
+  const [loteDiasSemana, setLoteDiasSemana] = useState<number[]>([1, 3])
+  const [loteHora, setLoteHora] = useState("14:00")
+  const [loteDataReferencia, setLoteDataReferencia] = useState(() => format(new Date(), "yyyy-MM-dd"))
+  const [loteSessoes, setLoteSessoes] = useState<PreviewAgendaLoteSessao[]>([])
+  const [lotePreviewPending, setLotePreviewPending] = useState(false)
 
   useEffect(() => {
     const dataParam = searchParams.get("data")
@@ -144,17 +184,39 @@ export default function AgendaPage() {
   const dateString = format(selectedDay, "yyyy-MM-dd")
   const profissionaisQuery = useProfissionais()
   const pacientesQuery = usePacientes()
-  const procedimentosQuery = useProcedimentos()
+  const profissionais = profissionaisQuery.data ?? EMPTY_USUARIOS
+  const espFiltroProcedimentosAgenda = useMemo(() => {
+    if (!openDialog) return undefined
+    if (isMedicoNaAgenda) {
+      const e = (usuario?.especialidade ?? "").trim().toUpperCase()
+      return e || undefined
+    }
+    if (!formState.usuario_id) return undefined
+    const prof = profissionais.find((p) => p.id === formState.usuario_id)
+    const e = (prof?.especialidade ?? "").trim().toUpperCase()
+    return e || undefined
+  }, [openDialog, isMedicoNaAgenda, usuario?.especialidade, formState.usuario_id, profissionais])
+  const procedimentosQuery = useProcedimentos(espFiltroProcedimentosAgenda)
   const agendaFiltroProfissional = isMedicoNaAgenda ? usuario?.id : selectedProfessional || undefined
   const agendaQuery = useAgendaDia(dateString, agendaFiltroProfissional || undefined)
   const criarAgenda = useCriarAgenda()
+  const criarAgendaLote = useCriarAgendaLote()
   const marcarFalta = useAtualizarStatusAgenda()
   const trocarProfissional = useAtualizarProfissionalAgenda()
 
-  const profissionais = (profissionaisQuery.data ?? []) as UsuarioResponse[]
-  const pacientes = (pacientesQuery.data ?? []) as PacienteResponse[]
-  const procedimentos = (procedimentosQuery.data ?? []) as ProcedimentoResponse[]
-  const agendamentos = (agendaQuery.data ?? []) as AgendaResponse[]
+  const pacientes = pacientesQuery.data ?? EMPTY_PACIENTES
+  const procedimentos = procedimentosQuery.data ?? EMPTY_PROCEDIMENTOS
+  const agendamentos = agendaQuery.data ?? EMPTY_AGENDAMENTOS
+
+  useEffect(() => {
+    if (!openDialog || procedimentos.length === 0) return
+    const ids = new Set(procedimentos.map((p) => p.id))
+    setSelectedProcedimentoIds((prev) => {
+      const next = prev.filter((id) => ids.has(id))
+      if (next.length === prev.length && next.every((id, i) => id === prev[i])) return prev
+      return next
+    })
+  }, [openDialog, procedimentos])
 
   const resumoProcedimentos = useMemo(() => {
     const list = procedimentos.filter((p) => selectedProcedimentoIds.includes(p.id))
@@ -170,8 +232,58 @@ export default function AgendaPage() {
     data: dateString,
     procedimentoId: primeiroProcedimentoId,
     duracaoTotalMin: resumoProcedimentos.dur > 0 ? resumoProcedimentos.dur : undefined,
-    enabled: openDialog,
+    enabled: openDialog && modoAgenda === "unico",
   })
+
+  useEffect(() => {
+    if (openDialog) {
+      setLoteDataReferencia(format(selectedDay, "yyyy-MM-dd"))
+    }
+  }, [openDialog, selectedDay])
+
+  async function resolverPacienteOuCriar(): Promise<string | null> {
+    if (pacienteModo === "existente") {
+      if (!formState.paciente_id) {
+        toast.error("Selecione um paciente")
+        return null
+      }
+      return formState.paciente_id
+    }
+    if (!novoPaciente.nome.trim() || !novoPaciente.cpf.trim()) {
+      toast.error("Nome e CPF são obrigatórios para novo paciente")
+      return null
+    }
+    try {
+      const nascISO = dataBRToISO(novoPaciente.data_nascimento)
+      const res = (await apiClient.criarPaciente({
+        nome: novoPaciente.nome.trim(),
+        cpf: novoPaciente.cpf.trim().replace(/\D/g, ""),
+        data_nascimento: nascISO || undefined,
+        telefone: (novoPaciente.telefone || "").replace(/\D/g, "") || undefined,
+        email: novoPaciente.email || undefined,
+      })) as { paciente?: Record<string, unknown> }
+      const raw = res?.paciente
+      const nid = raw?.id ?? raw?.ID
+      const pacienteId = String(nid ?? "")
+      if (!pacienteId) {
+        toast.error("Paciente criado mas ID não retornado pela API")
+        return null
+      }
+      setPacienteModo("existente")
+      setFormState((p) => ({ ...p, paciente_id: pacienteId }))
+      await pacientesQuery.refetch()
+      toast.success("Paciente cadastrado e selecionado para o agendamento")
+      return pacienteId
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string }
+      if (err?.status === 409) {
+        toast.error(err.message || "Já existe paciente com este CPF nesta clínica.")
+        return null
+      }
+      toast.error(err?.message || "Erro ao cadastrar paciente")
+      return null
+    }
+  }
 
   useEffect(() => {
     if (!openDialog) return
@@ -195,10 +307,94 @@ export default function AgendaPage() {
     setPacienteModo("existente")
     setNovoPaciente(emptyNovoPaciente)
     setSelectedProcedimentoIds([])
+    setModoAgenda("unico")
+    setLoteQuantidade(10)
+    setLoteDiasSemana([1, 3])
+    setLoteHora("14:00")
+    setLoteSessoes([])
+    setLoteDataReferencia(format(selectedDay, "yyyy-MM-dd"))
+  }
+
+  const toggleDiaLote = (d: number) => {
+    setLoteDiasSemana((prev) => {
+      const next = prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+      return [...next].sort((a, b) => a - b)
+    })
+  }
+
+  const handlePreviewLote = async () => {
+    if (selectedProcedimentoIds.length === 0) {
+      toast.error("Selecione ao menos um procedimento")
+      return
+    }
+    if (!formState.usuario_id) {
+      toast.error("Selecione o profissional")
+      return
+    }
+    if (loteDiasSemana.length === 0) {
+      toast.error("Marque ao menos um dia da semana")
+      return
+    }
+    const pacienteId = await resolverPacienteOuCriar()
+    if (!pacienteId) return
+    setLotePreviewPending(true)
+    try {
+      const res = await apiClient.previewAgendaLote({
+        paciente_id: pacienteId,
+        usuario_id: formState.usuario_id,
+        procedimento_ids: selectedProcedimentoIds,
+        quantidade_sessoes: loteQuantidade,
+        dias_semana: loteDiasSemana,
+        hora: loteHora.trim(),
+        data_referencia: loteDataReferencia.trim(),
+      })
+      const sessoes = res.sessoes ?? []
+      setLoteSessoes(sessoes)
+      if (sessoes.some((s) => !s.ok)) {
+        toast.warning("Alguns horários têm conflito ou estão fora da grade. Ajuste só as linhas necessárias e confirme o lote.")
+      } else {
+        toast.success("Prévia gerada: todos os horários passaram na validação.")
+      }
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string }
+      toast.error(err?.message || "Erro ao gerar prévia do lote")
+    } finally {
+      setLotePreviewPending(false)
+    }
+  }
+
+  const handleConfirmarLote = async () => {
+    if (loteSessoes.length === 0) {
+      toast.error('Clique em "Gerar prévia" antes de confirmar o lote.')
+      return
+    }
+    if (!formState.usuario_id) {
+      toast.error("Selecione o profissional")
+      return
+    }
+    if (selectedProcedimentoIds.length === 0) {
+      toast.error("Selecione ao menos um procedimento")
+      return
+    }
+    const pacienteId = await resolverPacienteOuCriar()
+    if (!pacienteId) return
+    try {
+      await criarAgendaLote.mutateAsync({
+        paciente_id: pacienteId,
+        usuario_id: formState.usuario_id,
+        procedimento_ids: selectedProcedimentoIds,
+        sessoes: loteSessoes.map((s) => ({ data_hora: s.data_hora })),
+      })
+      setOpenDialog(false)
+      resetDialog()
+    } catch {
+      /* toast em useCriarAgendaLote */
+    }
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (modoAgenda === "lote") return
 
     if (!formState.usuario_id || !formState.time) {
       toast.error("Selecione profissional e horário")
@@ -208,16 +404,9 @@ export default function AgendaPage() {
       toast.error("Selecione ao menos um procedimento")
       return
     }
-    if (pacienteModo === "existente" && !formState.paciente_id) {
-      toast.error("Selecione um paciente")
-      return
-    }
-    if (pacienteModo === "novo") {
-      if (!novoPaciente.nome.trim() || !novoPaciente.cpf.trim()) {
-        toast.error("Nome e CPF são obrigatórios para novo paciente")
-        return
-      }
-    }
+
+    const pacienteId = await resolverPacienteOuCriar()
+    if (!pacienteId) return
 
     const [yy, mo, da] = dateString.split("-").map(Number)
     const [hh, mi] = formState.time.split(":").map(Number)
@@ -235,27 +424,6 @@ export default function AgendaPage() {
     }
 
     try {
-      let pacienteId = formState.paciente_id
-      if (pacienteModo === "novo") {
-        const nascISO = dataBRToISO(novoPaciente.data_nascimento)
-        const res = (await apiClient.criarPaciente({
-          nome: novoPaciente.nome.trim(),
-          cpf: novoPaciente.cpf.trim().replace(/\D/g, ""),
-          data_nascimento: nascISO || undefined,
-          telefone: (novoPaciente.telefone || "").replace(/\D/g, "") || undefined,
-          email: novoPaciente.email || undefined,
-        })) as { paciente?: Record<string, unknown> }
-        const raw = res?.paciente
-        const nid = raw?.id ?? raw?.ID
-        pacienteId = String(nid ?? "")
-        if (!pacienteId) {
-          toast.error("Paciente criado mas ID não retornado pela API")
-          return
-        }
-        toast.success("Paciente cadastrado e selecionado para o agendamento")
-        await pacientesQuery.refetch()
-      }
-
       await criarAgenda.mutateAsync({
         paciente_id: pacienteId,
         usuario_id: formState.usuario_id,
@@ -290,8 +458,9 @@ export default function AgendaPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm text-slate-600 max-w-2xl">
-            Visualize e gerencie os agendamentos do dia. Cadastre paciente aqui quando precisar; procedimentos são mantidos em
-            Procedimentos.
+            {isMedicoNaAgenda
+              ? "Veja a sua agenda do dia selecionado e navegue no calendário para consultar atendimentos futuros (ou passados). Novos horários e remarcações são feitos pela secretaria ou pela gestão da clínica."
+              : "Visualize e gerencie os agendamentos do dia. Cadastre paciente aqui quando precisar; procedimentos são mantidos em Procedimentos."}
           </p>
         </div>
 
@@ -301,7 +470,8 @@ export default function AgendaPage() {
               <>
                 <label className="block text-sm font-medium text-slate-700">Sua agenda</label>
                 <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-800">
-                  Exibindo apenas os <strong>seus</strong> agendamentos ({usuario?.nome ?? "médico"}).
+                  Exibindo apenas os <strong>seus</strong> agendamentos ({usuario?.nome ?? "médico"}). Altere a data no
+                  calendário ao lado para ver outros dias.
                 </p>
               </>
             ) : (
@@ -329,6 +499,15 @@ export default function AgendaPage() {
           </div>
 
           <div className="flex flex-col gap-2">
+            {isMedicoNaAgenda ? (
+              <div className="max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <strong className="font-semibold">Somente visualização:</strong> você vê a sua agenda e pode navegar no
+                calendário para os seus atendimentos em outras datas. <strong>Não é possível criar</strong> novos
+                agendamentos neste perfil — isso é feito pela <strong>secretaria</strong> ou pela <strong>gestão da
+                clínica</strong>. Peça à recepção para marcar ou remarcar. Ao registrar um retorno no prontuário, o
+                sistema gera um resumo para a recepção agendar.
+              </div>
+            ) : (
             <Dialog
               open={openDialog}
               onOpenChange={(open) => {
@@ -347,13 +526,41 @@ export default function AgendaPage() {
                   Novo Agendamento
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogTitle>Criar Agendamento</DialogTitle>
                 <DialogDescription>
                   {searchParams.get("paciente_nome")
                     ? `Paciente sugerido: ${searchParams.get("paciente_nome")}`
                     : "Fluxo: procedimentos cadastrados em Procedimentos, depois paciente, profissional e horário da grade."}
                 </DialogDescription>
+
+                <div className="mt-4 flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <label className="inline-flex cursor-pointer items-center gap-2 font-medium text-slate-800">
+                    <input
+                      type="radio"
+                      name="modo-agenda"
+                      checked={modoAgenda === "unico"}
+                      onChange={() => {
+                        setModoAgenda("unico")
+                        setLoteSessoes([])
+                      }}
+                    />
+                    Um horário
+                  </label>
+                  <label className="inline-flex cursor-pointer items-center gap-2 font-medium text-slate-800">
+                    <input
+                      type="radio"
+                      name="modo-agenda"
+                      checked={modoAgenda === "lote"}
+                      onChange={() => {
+                        setModoAgenda("lote")
+                        setFormState((s) => ({ ...s, time: "" }))
+                        setLoteSessoes([])
+                      }}
+                    />
+                    Pacote (várias sessões)
+                  </label>
+                </div>
 
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                   {isPastDateRestricted && (
@@ -539,68 +746,237 @@ export default function AgendaPage() {
                       </label>
                     )}
 
-                    <label className="block text-sm font-medium text-slate-700">
-                      Horário (grade, fuso de Brasília) *
-                      {!formState.usuario_id || !primeiroProcedimentoId ? (
-                        <p className="mt-1 text-xs font-normal text-slate-500">
-                          Selecione ao menos um procedimento acima e o profissional para listar os horários livres.
-                        </p>
-                      ) : null}
-                      {horariosSlots.isFetching ? (
-                        <p className="mt-1 text-xs font-normal text-slate-500">Carregando horários…</p>
-                      ) : null}
-                      {horariosSlots.isError ? (
-                        <p className="mt-1 text-xs font-normal text-rose-600">
-                          Não foi possível carregar os horários. Tente de novo ou confira a API.
-                        </p>
-                      ) : null}
-                      {!horariosSlots.isFetching &&
-                      formState.usuario_id &&
-                      primeiroProcedimentoId &&
-                      (horariosSlots.data?.length ?? 0) === 0 ? (
-                        <p className="mt-1 text-xs font-normal text-amber-700">
-                          Nenhum horário livre nesta data (grade não cadastrada para este dia, fora do expediente ou
-                          agenda cheia). Ajuste em Equipe → horários do usuário ou escolha outra data.
-                        </p>
-                      ) : null}
-                      <select
-                        value={formState.time}
-                        onChange={(event) =>
-                          setFormState((prev) => ({ ...prev, time: event.target.value }))
-                        }
-                        className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        required
-                        disabled={
-                          !formState.usuario_id ||
-                          !primeiroProcedimentoId ||
-                          horariosSlots.isFetching ||
-                          (horariosSlots.data?.length ?? 0) === 0
-                        }
-                      >
-                        <option value="">
-                          {horariosSlots.isFetching ? "Carregando…" : "Selecione o horário"}
-                        </option>
-                        {(horariosSlots.data ?? []).map((hm, index) => (
-                          <option key={`slot-${index}-${hm}`} value={hm}>
-                            {hm}
+                    {modoAgenda === "unico" ? (
+                      <label className="block text-sm font-medium text-slate-700">
+                        Horário (grade, fuso de Brasília) *
+                        {!formState.usuario_id || !primeiroProcedimentoId ? (
+                          <p className="mt-1 text-xs font-normal text-slate-500">
+                            Selecione ao menos um procedimento acima e o profissional para listar os horários livres.
+                          </p>
+                        ) : null}
+                        {horariosSlots.isFetching ? (
+                          <p className="mt-1 text-xs font-normal text-slate-500">Carregando horários…</p>
+                        ) : null}
+                        {horariosSlots.isError ? (
+                          <p className="mt-1 text-xs font-normal text-rose-600">
+                            Não foi possível carregar os horários. Tente de novo ou confira a API.
+                          </p>
+                        ) : null}
+                        {!horariosSlots.isFetching &&
+                        formState.usuario_id &&
+                        primeiroProcedimentoId &&
+                        (horariosSlots.data?.length ?? 0) === 0 ? (
+                          <p className="mt-1 text-xs font-normal text-amber-700">
+                            Nenhum horário livre nesta data (grade não cadastrada para este dia, fora do expediente ou
+                            agenda cheia). Ajuste em Equipe → horários do usuário ou escolha outra data.
+                          </p>
+                        ) : null}
+                        <select
+                          value={formState.time}
+                          onChange={(event) =>
+                            setFormState((prev) => ({ ...prev, time: event.target.value }))
+                          }
+                          className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          required={modoAgenda === "unico"}
+                          disabled={
+                            !formState.usuario_id ||
+                            !primeiroProcedimentoId ||
+                            horariosSlots.isFetching ||
+                            (horariosSlots.data?.length ?? 0) === 0
+                          }
+                        >
+                          <option value="">
+                            {horariosSlots.isFetching ? "Carregando…" : "Selecione o horário"}
                           </option>
-                        ))}
-                      </select>
-                    </label>
+                          {(horariosSlots.data ?? EMPTY_HORARIOS).map((hm, index) => (
+                            <option key={`slot-${index}-${hm}`} value={hm}>
+                              {hm}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-xs text-slate-600">
+                        No modo <strong>pacote</strong>, os horários são gerados pela recorrência (dias da semana + hora
+                        fixa). Use <strong>Gerar prévia</strong> para validar grade e conflitos antes de confirmar.
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <Button type="button" variant="secondary" onClick={() => setOpenDialog(false)}>
+                  {modoAgenda === "lote" ? (
+                    <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                      <p className="text-sm font-medium text-slate-800">Recorrência do pacote</p>
+                      <p className="text-xs text-slate-600">
+                        Dias da semana (0 = domingo … 6 = sábado, como no calendário). Ex.: segundas e quartas marque{" "}
+                        <strong>Seg</strong> e <strong>Qua</strong>.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {DIAS_SEMANA_LOTE.map(({ valor, label }) => (
+                          <label
+                            key={valor}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-300"
+                              checked={loteDiasSemana.includes(valor)}
+                              onChange={() => toggleDiaLote(valor)}
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="lote-qtd">Sessões</Label>
+                          <Input
+                            id="lote-qtd"
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={loteQuantidade}
+                            onChange={(e) => setLoteQuantidade(Number(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="lote-hora">Hora (cada sessão)</Label>
+                          <Input
+                            id="lote-hora"
+                            type="time"
+                            value={loteHora.length === 5 ? loteHora : loteHora.slice(0, 5)}
+                            onChange={(e) => setLoteHora(e.target.value || "14:00")}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="lote-ref">1ª data (referência)</Label>
+                          <Input
+                            id="lote-ref"
+                            type="date"
+                            value={loteDataReferencia}
+                            onChange={(e) => setLoteDataReferencia(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full sm:w-auto"
+                        disabled={lotePreviewPending}
+                        onClick={() => void handlePreviewLote()}
+                      >
+                        {lotePreviewPending ? "Gerando prévia…" : "Gerar prévia"}
+                      </Button>
+                      {loteSessoes.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-slate-700">
+                            Ajuste apenas as linhas necessárias (ex.: conflito) e confirme o lote.
+                          </p>
+                          <div className="max-h-56 overflow-auto rounded-lg border border-slate-200 bg-white text-sm">
+                            <table className="w-full min-w-[320px] border-collapse text-left text-xs">
+                              <thead className="sticky top-0 bg-slate-100 text-slate-700">
+                                <tr>
+                                  <th className="border-b border-slate-200 px-2 py-2">#</th>
+                                  <th className="border-b border-slate-200 px-2 py-2">Data/hora</th>
+                                  <th className="border-b border-slate-200 px-2 py-2">Status</th>
+                                  <th className="border-b border-slate-200 px-2 py-2">Ajustar</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {loteSessoes.map((sessao, idx) => (
+                                  <tr
+                                    key={`lote-row-${sessao.indice}-${idx}`}
+                                    className={sessao.ok ? "bg-white" : "bg-rose-50/80"}
+                                  >
+                                    <td className="border-b border-slate-100 px-2 py-1.5 align-middle">{sessao.indice}</td>
+                                    <td className="border-b border-slate-100 px-2 py-1.5 align-middle text-slate-800">
+                                      {(() => {
+                                        try {
+                                          return format(parseISO(sessao.data_hora), "EEE dd/MM/yyyy HH:mm", {
+                                            locale: ptBR,
+                                          })
+                                        } catch {
+                                          return sessao.data_hora
+                                        }
+                                      })()}
+                                    </td>
+                                    <td className="border-b border-slate-100 px-2 py-1.5 align-middle">
+                                      {sessao.ok ? (
+                                        <span className="text-emerald-700">Ok</span>
+                                      ) : (
+                                        <span className="text-rose-700" title={sessao.erro}>
+                                          Conflito
+                                        </span>
+                                      )}
+                                      {!sessao.ok && sessao.erro ? (
+                                        <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-rose-600">
+                                          {sessao.erro}
+                                        </p>
+                                      ) : null}
+                                    </td>
+                                    <td className="border-b border-slate-100 px-1 py-1 align-middle">
+                                      <Input
+                                        className="h-8 min-w-[9.5rem] text-[11px]"
+                                        type="datetime-local"
+                                        value={(() => {
+                                          try {
+                                            return format(parseISO(sessao.data_hora), "yyyy-MM-dd'T'HH:mm")
+                                          } catch {
+                                            return ""
+                                          }
+                                        })()}
+                                        onChange={(e) => {
+                                          const v = e.target.value
+                                          if (!v) return
+                                          const d = parse(v, "yyyy-MM-dd'T'HH:mm", new Date())
+                                          if (!isValid(d)) return
+                                          setLoteSessoes((prev) =>
+                                            prev.map((row, j) =>
+                                              j === idx
+                                                ? { ...row, data_hora: formatISO(d), ok: true, erro: undefined }
+                                                : row
+                                            )
+                                          )
+                                        }}
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <ModalActions>
+                    <ModalButton variant="danger" type="button" onClick={() => setOpenDialog(false)}>
                       Cancelar
-                    </Button>
-                    <Button type="submit" className="flex items-center justify-center gap-2" disabled={criarAgenda.isPending}>
-                      <Plus className="h-4 w-4" />
-                      {criarAgenda.isPending ? "Salvando..." : "Agendar"}
-                    </Button>
-                  </div>
+                    </ModalButton>
+                    {modoAgenda === "unico" ? (
+                      <ModalButton variant="primary" type="submit" className="inline-flex" disabled={criarAgenda.isPending}>
+                        <Plus {...modalIconProps} />
+                        {criarAgenda.isPending ? "Salvando..." : "Agendar"}
+                      </ModalButton>
+                    ) : (
+                      <ModalButton
+                        variant="primary"
+                        type="button"
+                        className="inline-flex"
+                        disabled={criarAgendaLote.isPending || loteSessoes.length === 0}
+                        onClick={() => void handleConfirmarLote()}
+                      >
+                        <Plus {...modalIconProps} />
+                        {criarAgendaLote.isPending
+                          ? "Salvando lote…"
+                          : `Confirmar lote (${loteSessoes.length} sessões)`}
+                      </ModalButton>
+                    )}
+                  </ModalActions>
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
       </div>

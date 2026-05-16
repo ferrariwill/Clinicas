@@ -28,10 +28,15 @@ func SenhaAleatoria(n int) string {
 	return string(out)
 }
 
+// Custo 12 equilibra segurança e tempo de verificação no login (14 era ~16× mais lento que o padrão 10).
 func HashSenha(senha string) (string, error) {
-
-	bytes, err := bcrypt.GenerateFromPassword([]byte(senha), 14)
+	bytes, err := bcrypt.GenerateFromPassword([]byte(senha), 12)
 	return string(bytes), err
+}
+
+// SenhaHashCost retorna o custo bcrypt embutido no hash (para rehash progressivo no login).
+func SenhaHashCost(hash string) (int, error) {
+	return bcrypt.Cost([]byte(hash))
 }
 
 func VerificarSenha(senha, hash string) bool {

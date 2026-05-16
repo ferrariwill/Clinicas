@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/ferrariwill/Clinicas/API/internal/especialidade"
 	"github.com/ferrariwill/Clinicas/API/internal/logger"
 	"github.com/ferrariwill/Clinicas/API/internal/mail"
 	"github.com/ferrariwill/Clinicas/API/models"
@@ -31,16 +33,30 @@ type UsuarioService interface {
 	AtualizarTipoUsuarioNaClinica(usuarioID, clinicaID, tipoUsuarioID uint) error
 
 	CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, clinicaID uint) (models.Usuario, bool, error)
+	/** Ajusta u.Especialidade conforme o tipo (atual ou novo) e o corpo opcional da API. */
+	SincronizarEspecialidadeComTipo(u *models.Usuario, clinicaID uint, novoTipoID *uint, especialidadeBody *string) error
 }
 
 type usuarioService struct {
-	repo    repositories.UsuarioRepository
-	ucRepo  repositories.UsuarioClinicaRepository
-	mailer  *mail.Mailer
+	repo     repositories.UsuarioRepository
+	ucRepo   repositories.UsuarioClinicaRepository
+	tipoRepo repositories.TipoUsuarioRepository
+	mailer   *mail.Mailer
 }
 
-func NovoUsuarioService(repo repositories.UsuarioRepository, ucRepo repositories.UsuarioClinicaRepository, mailer *mail.Mailer) UsuarioService {
-	return &usuarioService{repo: repo, ucRepo: ucRepo, mailer: mailer}
+func NovoUsuarioService(repo repositories.UsuarioRepository, ucRepo repositories.UsuarioClinicaRepository, tipoRepo repositories.TipoUsuarioRepository, mailer *mail.Mailer) UsuarioService {
+	return &usuarioService{repo: repo, ucRepo: ucRepo, tipoRepo: tipoRepo, mailer: mailer}
+}
+
+// NormalizarPorcentagemRepasse limita o percentual de repasse ao intervalo 0–100 com duas casas decimais.
+func NormalizarPorcentagemRepasse(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return math.Round(v*100) / 100
 }
 
 func (s *usuarioService) CriarUsuario(u *models.Usuario, clinicaId uint) error {
@@ -48,6 +64,15 @@ func (s *usuarioService) CriarUsuario(u *models.Usuario, clinicaId uint) error {
 	if u.Nome == "" {
 		return errors.New("informe o nome do usuário")
 	}
+	tipo, err := s.tipoRepo.BuscarPorIDClinica(u.TipoUsuarioID, clinicaId)
+	if err != nil {
+		return fmt.Errorf("tipo de usuário inválido para esta clínica: %w", err)
+	}
+	esp, err := especialidade.ResolverParaUsuario(tipo.Papel, u.Especialidade)
+	if err != nil {
+		return err
+	}
+	u.Especialidade = esp
 	if utf8.RuneCountInString(u.Nome) < 2 {
 		return errors.New("o nome deve ter pelo menos 2 caracteres")
 	}
@@ -84,6 +109,7 @@ func (s *usuarioService) CriarUsuario(u *models.Usuario, clinicaId uint) error {
 		ex.TipoUsuarioID = u.TipoUsuarioID
 		ex.Ativo = true
 		ex.ObrigarTrocaSenha = obrigar
+		ex.Especialidade = u.Especialidade
 		if err := s.repo.AtualizarUsuario(ex); err != nil {
 			return err
 		}
@@ -169,6 +195,20 @@ func (s *usuarioService) CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, cli
 		return models.Usuario{}, false, errors.New("e-mail inválido")
 	}
 
+	tipo, errTipo := s.tipoRepo.BuscarPorIDClinica(dto.TipoUsuarioID, clinicaID)
+	if errTipo != nil {
+		return models.Usuario{}, false, fmt.Errorf("tipo de usuário inválido para esta clínica: %w", errTipo)
+	}
+	esp, errEsp := especialidade.ResolverParaUsuario(tipo.Papel, dto.Especialidade)
+	if errEsp != nil {
+		return models.Usuario{}, false, errEsp
+	}
+
+	pctRepasse := 0.0
+	if dto.PorcentagemRepasse != nil {
+		pctRepasse = NormalizarPorcentagemRepasse(*dto.PorcentagemRepasse)
+	}
+
 	var plain string
 	var obrigar bool
 	if dto.Senha != nil && strings.TrimSpace(*dto.Senha) != "" {
@@ -196,6 +236,8 @@ func (s *usuarioService) CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, cli
 		existing.TipoUsuarioID = dto.TipoUsuarioID
 		existing.Ativo = true
 		existing.ObrigarTrocaSenha = obrigar
+		existing.Especialidade = esp
+		existing.PorcentagemRepasse = pctRepasse
 		if err := s.repo.AtualizarUsuario(existing); err != nil {
 			return models.Usuario{}, false, err
 		}
@@ -214,13 +256,15 @@ func (s *usuarioService) CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, cli
 	}
 
 	usuario := models.Usuario{
-		Nome:              strings.TrimSpace(dto.Nome),
-		Email:             emailNorm,
-		Senha:             senhaHash,
-		ClinicaID:         clinicaID,
-		TipoUsuarioID:     dto.TipoUsuarioID,
-		Ativo:             true,
-		ObrigarTrocaSenha: obrigar,
+		Nome:                 strings.TrimSpace(dto.Nome),
+		Email:                emailNorm,
+		Senha:                senhaHash,
+		ClinicaID:            clinicaID,
+		TipoUsuarioID:        dto.TipoUsuarioID,
+		Ativo:                true,
+		ObrigarTrocaSenha:    obrigar,
+		Especialidade:        esp,
+		PorcentagemRepasse:   pctRepasse,
 	}
 
 	err = s.repo.CriarUsuario(&usuario)
@@ -241,6 +285,36 @@ func (s *usuarioService) CriarUsuarioClinica(dto dto.CriarUsuarioClinicaDTO, cli
 		return usuario, false, errMail
 	}
 	return usuario, enviado, nil
+}
+
+func (s *usuarioService) SincronizarEspecialidadeComTipo(u *models.Usuario, clinicaID uint, novoTipoID *uint, especialidadeBody *string) error {
+	tid := u.TipoUsuarioID
+	if novoTipoID != nil {
+		tid = *novoTipoID
+	}
+	tipo, err := s.tipoRepo.BuscarPorIDClinica(tid, clinicaID)
+	if err != nil {
+		return fmt.Errorf("tipo de usuário inválido para esta clínica: %w", err)
+	}
+	if especialidadeBody != nil {
+		esp, err := especialidade.ResolverParaUsuario(tipo.Papel, *especialidadeBody)
+		if err != nil {
+			return err
+		}
+		u.Especialidade = esp
+		return nil
+	}
+	if novoTipoID == nil {
+		return nil
+	}
+	if !especialidade.ExigeParaPapel(tipo.Papel) {
+		u.Especialidade = ""
+		return nil
+	}
+	if u.Especialidade != "" && especialidade.Valida(u.Especialidade) {
+		return nil
+	}
+	return errors.New("ao alterar para este papel, informe especialidade: MEDICO, FISIOTERAPEUTA ou DENTISTA")
 }
 
 // enviarEmailAcessoEquipe envia credenciais com o mesmo casing cadastrado (e-mail normalizado em minúsculas; senha exata).

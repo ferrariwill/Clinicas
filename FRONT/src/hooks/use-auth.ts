@@ -4,6 +4,11 @@ import { useAuthStore } from "@/store/auth-store";
 import { apiClient } from "@/services/api-client";
 import type { UsuarioInfo } from "@/types/api";
 import { toast } from "sonner";
+import {
+  MINHAS_PERMISSOES_GC_MS,
+  MINHAS_PERMISSOES_STALE_MS,
+  minhasPermissoesRotasQueryKey,
+} from "@/hooks/use-minhas-permissoes-rotas";
 
 function mapUsuarioInfoFromAuthPayload(
   raw: Record<string, unknown>,
@@ -18,6 +23,7 @@ function mapUsuarioInfoFromAuthPayload(
     clinic_id: cid == null || cid === undefined ? "" : String(cid),
     ativo: Boolean(raw.ativo ?? raw.Ativo ?? true),
     obrigar_troca_senha: obrigarTroca,
+    especialidade: String(raw.especialidade ?? raw.Especialidade ?? "").trim() || undefined,
   };
 }
 
@@ -54,7 +60,15 @@ export const useAuth = () => {
       )
       const usuario = mapUsuarioInfoFromAuthPayload(raw, obrigar)
       setUsuario(usuario, response.token)
-      void qc.invalidateQueries({ queryKey: ["minhas-permissoes-rotas"] })
+      /** Inicia GET de permissões antes do `router.push`: o layout do dashboard deduplica com esta requisição. */
+      if (usuario.id) {
+        void qc.prefetchQuery({
+          queryKey: minhasPermissoesRotasQueryKey(usuario.id),
+          queryFn: () => apiClient.getMinhasPermissoesRotas(),
+          staleTime: MINHAS_PERMISSOES_STALE_MS,
+          gcTime: MINHAS_PERMISSOES_GC_MS,
+        })
+      }
       return { success: true, data: { ...response, usuario } }
     } catch (error: unknown) {
       const err = error as { message?: string }
@@ -88,7 +102,14 @@ export const useAuth = () => {
       )
       const next = mapUsuarioInfoFromAuthPayload(raw, obrigar)
       setUsuario(next, response.token)
-      void qc.invalidateQueries({ queryKey: ["minhas-permissoes-rotas"] })
+      if (next.id) {
+        void qc.prefetchQuery({
+          queryKey: minhasPermissoesRotasQueryKey(next.id),
+          queryFn: () => apiClient.getMinhasPermissoesRotas(),
+          staleTime: MINHAS_PERMISSOES_STALE_MS,
+          gcTime: MINHAS_PERMISSOES_GC_MS,
+        })
+      }
       toast.success("Clínica alterada com sucesso")
       return { success: true as const }
     } catch (error: unknown) {

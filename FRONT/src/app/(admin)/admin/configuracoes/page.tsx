@@ -6,7 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  ModalActions,
+  ModalButton,
+  modalIconProps,
+} from "@/components/ui/dialog"
 import {
   usePlanos,
   useCriarPlano,
@@ -165,12 +173,15 @@ export default function AdminConfiguracoesPage() {
                 <Input id="limite_usuarios" name="limite_usuarios" type="number" min={1} value={form.limite_usuarios} onChange={handleField} required />
               </div>
             </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={criar.isPending} className="gap-2">
-                <Plus className="h-4 w-4" />{criar.isPending ? "Criando..." : "Criar Plano"}
-              </Button>
-            </div>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpen(false)}>
+                Cancelar
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criar.isPending} className="inline-flex">
+                <Plus {...modalIconProps} />
+                {criar.isPending ? "Criando..." : "Criar Plano"}
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>
@@ -198,12 +209,14 @@ export default function AdminConfiguracoesPage() {
               </div>
             </div>
             <p className="text-xs text-slate-500">Para ativar ou desativar o plano no catálogo, use o botão no card (não altera assinaturas já vinculadas).</p>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpenEdit(false)}>Cancelar</Button>
-              <Button type="submit" disabled={atualizar.isPending}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenEdit(false)}>
+                Cancelar
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={atualizar.isPending}>
                 {atualizar.isPending ? "Salvando…" : "Salvar alterações"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

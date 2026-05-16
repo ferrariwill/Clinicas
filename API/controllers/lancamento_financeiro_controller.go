@@ -67,7 +67,7 @@ func parseDateRequired(s string) (time.Time, error) {
 }
 
 func lancamentoToJSON(l models.LancamentoFinanceiro) gin.H {
-	return gin.H{
+	out := gin.H{
 		"id":         strconv.FormatUint(uint64(l.ID), 10),
 		"data":       l.Data.Format("2006-01-02"),
 		"descricao":  l.Descricao,
@@ -78,6 +78,12 @@ func lancamentoToJSON(l models.LancamentoFinanceiro) gin.H {
 		"criado_em":  l.CreatedAt.Format(time.RFC3339),
 		"agenda_id":  nil,
 	}
+	if l.FechamentoPeriodoID != nil {
+		out["fechamento_periodo_id"] = strconv.FormatUint(uint64(*l.FechamentoPeriodoID), 10)
+	} else {
+		out["fechamento_periodo_id"] = nil
+	}
+	return out
 }
 
 // Resumo GET /clinicas/financeiro/resumo?data_inicio=&data_fim=
@@ -110,13 +116,17 @@ func (lc *LancamentoFinanceiroController) Resumo(c *gin.Context) {
 		return
 	}
 	fixoMensal := 0.0
+	fixoPeriodo := 0.0
 	if lc.custoFixoRepo != nil {
 		if s, e := lc.custoFixoRepo.SomaMensalAtivos(clinicaID); e == nil {
 			fixoMensal = s
 		}
+		ativos := true
+		if rows, e := lc.custoFixoRepo.ListarPorClinica(clinicaID, &ativos); e == nil {
+			fixoPeriodo = services.SomarCustosFixosProjetadosNoPeriodo(rows, inicio, fim)
+		}
 	}
 	meses := mesesInclusivosNoIntervalo(inicio, fim)
-	fixoPeriodo := fixoMensal * float64(meses)
 	saiTotal := sai + fixoPeriodo
 	saldoTotal := ent - saiTotal
 	c.JSON(http.StatusOK, gin.H{

@@ -7,4 +7,6 @@ type CriarProcedimentoDTO struct {
 	DuracaoMin int     `json:"duracao_min"`
 	ConvenioID uint    `json:"convenio_id"`
 	Ativo      bool    `json:"ativo"`
+	// Opcional: vazio = todas as especialidades; caso contrário MEDICO, FISIOTERAPEUTA ou DENTISTA.
+	Especialidade string `json:"especialidade"`
 }

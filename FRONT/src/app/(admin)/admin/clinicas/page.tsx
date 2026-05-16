@@ -6,7 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  ModalActions,
+  ModalButton,
+  modalIconProps,
+} from "@/components/ui/dialog"
 import {
   useAdminClinicas,
   useAdminClinicaConfiguracao,
@@ -451,12 +459,15 @@ export default function AdminClinicasPage() {
               <input type="checkbox" name="ativa" checked={editForm.ativa} onChange={handleEditField} className="rounded border-slate-300" />
               Clínica ativa
             </label>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={atualizarClinica.isPending} className="gap-2">
-                <Pencil className="h-4 w-4" />{atualizarClinica.isPending ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setEditOpen(false)}>
+                Cancelar
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={atualizarClinica.isPending} className="inline-flex">
+                <Pencil {...modalIconProps} />
+                {atualizarClinica.isPending ? "Salvando…" : "Salvar"}
+              </ModalButton>
+            </ModalActions>
           </form>
           {editingId != null ? <AdminCobrancaRecepcaoSection key={editingId} clinicaId={editingId} /> : null}
         </DialogContent>
@@ -551,12 +562,15 @@ export default function AdminClinicasPage() {
                 />
               </div>
             )}
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={criar.isPending} className="gap-2">
-                <Plus className="h-4 w-4" />{criar.isPending ? "Criando..." : "Criar Clínica"}
-              </Button>
-            </div>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpen(false)}>
+                Cancelar
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criar.isPending} className="inline-flex">
+                <Plus {...modalIconProps} />
+                {criar.isPending ? "Criando..." : "Criar Clínica"}
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

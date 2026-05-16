@@ -4,6 +4,7 @@ import { apiClient } from "@/services/api-client"
 import type {
   AgendaRequest,
   AgendaResponse,
+  CriarAgendaLoteRequest,
   UsuarioResponse,
   PacienteResponse,
   ProcedimentoResponse,
@@ -55,6 +56,20 @@ export function mapUsuarioProfissionalFromAPI(raw: Record<string, unknown>): Usu
         : typeof raw.PermiteSimultaneo === "boolean"
           ? raw.PermiteSimultaneo
           : undefined,
+    especialidade: (() => {
+      const e = raw.especialidade ?? raw.Especialidade
+      if (typeof e === "string" && e.trim()) return e.trim().toUpperCase()
+      return undefined
+    })(),
+    porcentagem_repasse: (() => {
+      const v = raw.porcentagem_repasse ?? raw.PorcentagemRepasse
+      if (typeof v === "number" && Number.isFinite(v)) return v
+      if (v != null) {
+        const n = Number(v)
+        return Number.isFinite(n) ? n : undefined
+      }
+      return undefined
+    })(),
     clinic_id: String(raw.clinic_id ?? raw.clinica_id ?? raw.ClinicaID ?? ""),
     criado_em:
       typeof raw.criado_em === "string"
@@ -76,12 +91,16 @@ export function mapProcedimentoFromAPI(raw: Record<string, unknown>): Procedimen
     raw.duracao ??
     raw.DuracaoMin
   const val = raw.valor ?? raw.preco ?? raw.Preco ?? raw.Valor
+  const espRaw = raw.especialidade ?? raw.Especialidade
+  const esp =
+    typeof espRaw === "string" && espRaw.trim() ? espRaw.trim().toUpperCase() : undefined
   return {
     id: String(id ?? ""),
     nome: typeof nome === "string" ? nome : "",
     descricao: typeof desc === "string" ? desc : undefined,
     duracao_minutos: typeof dur === "number" ? dur : Number(dur) || 0,
     valor: typeof val === "number" ? val : Number(val) || 0,
+    especialidade: esp,
     ativo: Boolean(raw.ativo ?? raw.Ativo ?? true),
     clinic_id: String(raw.clinic_id ?? raw.clinica_id ?? raw.ClinicaID ?? ""),
     criado_em:
@@ -102,6 +121,9 @@ export function mapPacienteFromAPI(raw: Record<string, unknown>): PacienteRespon
   const tel = raw.telefone ?? raw.Telefone
   const email = raw.email ?? raw.Email
   const end = raw.endereco ?? raw.Endereco
+  const pr = raw.plano_retorno_previsto_em ?? raw.PlanoRetornoPrevistoEm
+  const ps = raw.plano_sessoes_previstas ?? raw.PlanoSessoesPrevistas
+  const planoRet = typeof pr === "string" && pr.trim() ? pr : undefined
   return {
     id: String(id ?? ""),
     nome: typeof nome === "string" ? nome : "",
@@ -117,6 +139,13 @@ export function mapPacienteFromAPI(raw: Record<string, unknown>): PacienteRespon
         : typeof raw.CreatedAt === "string"
           ? raw.CreatedAt
           : "",
+    plano_retorno_previsto_em: planoRet?.trim() ? planoRet : undefined,
+    plano_sessoes_previstas:
+      typeof ps === "number" && Number.isFinite(ps)
+        ? ps
+        : ps != null
+          ? Number(ps) || undefined
+          : undefined,
   }
 }
 
@@ -186,12 +215,16 @@ export function mapAgendaFromAPI(raw: Record<string, unknown>): AgendaResponse {
     liberado_cobranca_em = null
   }
 
+  const espUsu = usu?.especialidade ?? usu?.Especialidade
+
   return {
     id: String(id ?? ""),
     paciente_id: pid,
     paciente_nome: typeof (pac?.nome ?? pac?.Nome) === "string" ? String(pac?.nome ?? pac?.Nome) : undefined,
     usuario_id: uid,
     usuario_nome: typeof (usu?.nome ?? usu?.Nome) === "string" ? String(usu?.nome ?? usu?.Nome) : undefined,
+    usuario_especialidade:
+      typeof espUsu === "string" && espUsu.trim() ? String(espUsu).trim().toUpperCase() : undefined,
     procedimento_id: prid,
     procedimento_nome: nomes[0],
     procedimento_ids: ids.length ? ids : prid ? [prid] : [],
@@ -331,11 +364,12 @@ export const useProfissionais = () => {
   })
 }
 
-export const useProcedimentos = () => {
+export const useProcedimentos = (filtroEspecialidade?: string) => {
+  const espKey = (filtroEspecialidade ?? "").trim().toUpperCase()
   return useQuery<ProcedimentoResponse[]>({
-    queryKey: ["procedimentos"],
+    queryKey: ["procedimentos", espKey],
     queryFn: async (): Promise<ProcedimentoResponse[]> => {
-      const response = await apiClient.getProcedimentos()
+      const response = await apiClient.getProcedimentos(undefined, espKey || undefined)
       const rawList = (Array.isArray(response) ? response : (response as { procedimentos?: unknown[] }).procedimentos ?? []) as Record<
         string,
         unknown
@@ -355,6 +389,34 @@ export const useCriarAgenda = () => {
     onSuccess: () => {
       toast.success("Agendamento criado com sucesso")
       queryClient.invalidateQueries({ queryKey: ["agenda-dia"] })
+    },
+  })
+}
+
+export const useCriarAgendaLote = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: CriarAgendaLoteRequest) => {
+      return await apiClient.criarAgendaLote(payload)
+    },
+    onSuccess: (data: unknown) => {
+      const total =
+        typeof data === "object" &&
+        data !== null &&
+        "total" in data &&
+        typeof (data as { total: unknown }).total === "number"
+          ? (data as { total: number }).total
+          : undefined
+      toast.success(total != null ? `${total} sessões agendadas em lote.` : "Sessões agendadas em lote.")
+      queryClient.invalidateQueries({ queryKey: ["agenda-dia"] })
+    },
+    onError: (e: unknown) => {
+      const err = e as { status?: number; message?: string }
+      if (err?.status === 409) {
+        toast.error(err.message || "Conflito em algum horário do lote.")
+        return
+      }
+      toast.error(err?.message || "Erro ao criar agendamentos em lote")
     },
   })
 }

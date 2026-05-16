@@ -2,7 +2,8 @@ package DTO
 
 // UsuarioHorarioRequest representa a requisição para definir horários do usuário
 type UsuarioHorarioRequest struct {
-	DiaSemana     int    `json:"dia_semana" binding:"required,min=0,max=6" example:"1"`
+	// Não use "required" em int: o validador trata 0 como vazio e rejeita Domingo (dia_semana=0).
+	DiaSemana     int    `json:"dia_semana" binding:"gte=0,lte=6" example:"1"`
 	HorarioInicio string `json:"horario_inicio" binding:"required" example:"08:00"`
 	HorarioFim    string `json:"horario_fim" binding:"required" example:"18:00"`
 	Ativo         bool   `json:"ativo" example:"true"`

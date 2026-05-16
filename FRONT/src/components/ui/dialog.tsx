@@ -94,3 +94,6 @@ export {
   DialogTitle,
   DialogDescription,
 }
+
+export { ModalActions, ModalButton, ModalFooter, modalIconProps } from "@/components/ui/modal-actions"
+export type { ModalButtonProps, ModalButtonVariant } from "@/components/ui/modal-actions"

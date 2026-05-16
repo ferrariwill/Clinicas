@@ -21,6 +21,7 @@ import {
   RefreshCw,
   DollarSign,
 } from "lucide-react"
+import { MedicoResumoClinicoDashboard } from "@/components/medico-resumo-clinico-dashboard"
 
 /**
  * Dashboard Operacional com integração de dados financeiros
@@ -36,6 +37,7 @@ export default function DashboardOperacionalPage() {
   const router = useRouter()
   const { usuario, clinicaId, userRole } = useAuth()
   const isMedico = (userRole ?? "").toUpperCase() === "MEDICO"
+  const mostrarMiniClinico = ["MEDICO", "DONO", "DONO_CLINICA"].includes((userRole ?? "").trim().toUpperCase())
   const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
   const [selectedClinicaId, setSelectedClinicaId] = useState<string | undefined>(clinicaId ?? undefined)
   const { podeDashboard } = useMemo(
@@ -236,6 +238,15 @@ export default function DashboardOperacionalPage() {
           </CardContent>
         </Card>
       </div>
+
+      {mostrarMiniClinico && (
+        <section className="space-y-3" aria-labelledby="heading-mini-clinico">
+          <h2 id="heading-mini-clinico" className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            Resumo clínico (seus dados)
+          </h2>
+          <MedicoResumoClinicoDashboard clinicaId={selectedClinicaId} semanas={12} compact />
+        </section>
+      )}
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">

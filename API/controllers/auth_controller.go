@@ -27,6 +27,7 @@ func usuarioInfoFromModel(usuario *models.Usuario) UsuarioInfo {
 		ClinicaID:         &cid,
 		Papel:             papel,
 		ObrigarTrocaSenha: usuario.ObrigarTrocaSenha,
+		Especialidade:     usuario.Especialidade,
 	}
 }
 
@@ -53,6 +54,8 @@ type UsuarioInfo struct {
 	ClinicaID          *uint  `json:"clinica_id" example:"1"`
 	Papel              string `json:"papel" example:"MEDICO"`
 	ObrigarTrocaSenha  bool   `json:"obrigar_troca_senha"`
+	// Especialidade: MEDICO | FISIOTERAPEUTA | DENTISTA (papéis DONO e MEDICO).
+	Especialidade string `json:"especialidade"`
 }
 
 // @Summary Login de usuário

@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar } from "@/components/ui/calendar"
 import { MetricCardSkeleton } from "@/components/ui/skeleton"
 import { FileText, RefreshCw, Stethoscope, Play, CheckCircle2, Banknote } from "lucide-react"
+import { textosAtendimentoPorEspecialidade } from "@/lib/clinica-especialidade"
 
 function horaAgenda(dataHorario: string) {
   try {
@@ -46,6 +47,10 @@ export default function AtendimentosPage() {
   const isDono = usuario?.tipo_usuario === "DONO" || usuario?.tipo_usuario === "DONO_CLINICA"
   const isSecretaria = usuario?.tipo_usuario === "SECRETARIA"
   const podeFiltrarTodosProfissionais = isDono || isSecretaria
+  const textosAtend = useMemo(
+    () => textosAtendimentoPorEspecialidade(usuario?.especialidade),
+    [usuario?.especialidade]
+  )
 
   useEffect(() => {
     if (!permissoesOk) return
@@ -99,9 +104,7 @@ export default function AtendimentosPage() {
         <div>
           <p className="text-sm text-slate-600 max-w-2xl flex items-start gap-2">
             <Stethoscope className="h-5 w-5 text-sky-600 shrink-0 mt-0.5" aria-hidden />
-            <span>
-              Veja os agendamentos do dia e abra o prontuário do paciente para registrar evolução, queixas e conduta.
-            </span>
+            <span>{textosAtend.hint}</span>
           </p>
         </div>
         {podeFiltrarTodosProfissionais && (
@@ -191,7 +194,7 @@ export default function AtendimentosPage() {
                             className="gap-2"
                           >
                             <Play className="h-4 w-4" />
-                            Iniciar consulta
+                            {textosAtend.iniciar}
                           </Button>
                         )}
                         {(a.status || "").toUpperCase() === "EM ATENDIMENTO" && (
@@ -205,7 +208,7 @@ export default function AtendimentosPage() {
                             className="gap-2 bg-emerald-600 hover:bg-emerald-700"
                           >
                             <CheckCircle2 className="h-4 w-4" />
-                            Finalizar consulta
+                            {textosAtend.finalizar}
                           </Button>
                         )}
                         {(a.status || "").toUpperCase() === "REALIZADO" &&
@@ -230,7 +233,7 @@ export default function AtendimentosPage() {
                           )}
                         >
                           <FileText className="h-4 w-4" />
-                          Abrir prontuário
+                          {textosAtend.prontuario}
                         </Link>
                       </div>
                     </li>

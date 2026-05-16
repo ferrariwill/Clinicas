@@ -88,6 +88,7 @@ func (r *cobrancaRepository) ListarRelatorioPagas(clinicaID uint, inicio, fim *t
 	var rows []models.CobrancaConsulta
 	q := r.db.Where("clinica_id = ? AND status = ?", clinicaID, models.CobrancaStatusPago).
 		Preload("Agenda.Paciente").
+		Preload("Agenda.Usuario").
 		Preload("Agenda.Procedimento").
 		Preload("Agenda.ProcedimentosExtras.Procedimento").
 		Order("updated_at DESC")

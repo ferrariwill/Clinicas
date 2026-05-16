@@ -22,7 +22,13 @@ var ErrCapacidadeAgendaExcedida = errors.New("limite de atendimentos simultâneo
 
 type AgendaReposiory interface {
 	Criar(agenda models.Agenda, procedimentosExtras []uint) (models.Agenda, error)
+	// VerificarSlotAgendamento valida grade, horário futuro e conflitos sem persistir (transação é revertida).
+	VerificarSlotAgendamento(agenda models.Agenda, procedimentosExtras []uint) error
+	// CriarLote persiste vários agendamentos na mesma transação (tudo ou nada).
+	CriarLote(itens []AgendaLoteItem) ([]models.Agenda, error)
 	Listar(clinicaID uint, dia *time.Time, usuarioID *uint) ([]models.Agenda, error)
+	// ListarPassadosPorPaciente retorna agendamentos já realizados (data_hora < agora) do paciente na clínica.
+	ListarPassadosPorPaciente(clinicaID, pacienteID uint, limite int) ([]models.Agenda, error)
 	AtualizarStatus(clinicaID, id, statusID, usuarioLancamentoID uint, pularReceitaAutomatica bool) error
 	LiberarCobranca(clinicaID, agendaID uint) error
 	AtualizarProfissionalAgenda(clinicaID, agendaID, novoUsuarioID uint) error
@@ -126,6 +132,12 @@ func validaHorarioNaGradeProfissional(tx *gorm.DB, usuarioID uint, dataHora time
 	return errors.New("o horário escolhido está fora da disponibilidade cadastrada para o profissional neste dia")
 }
 
+// AgendaLoteItem um agendamento a ser criado em lote (mesmo paciente/profissional/procedimentos).
+type AgendaLoteItem struct {
+	Agenda              models.Agenda
+	ProcedimentosExtras []uint
+}
+
 func duracaoAgendamentoExistenteTx(tx *gorm.DB, ex models.Agenda, clinicaID uint) int {
 	total := duracaoProcedimentoEmTx(tx, clinicaID, ex.ProcedimentoID)
 	var adicionais []models.AgendaProcedimento
@@ -136,103 +148,141 @@ func duracaoAgendamentoExistenteTx(tx *gorm.DB, ex models.Agenda, clinicaID uint
 	return total
 }
 
+func (r *agendaRepository) validarPreCriacaoAgendaTx(tx *gorm.DB, agenda *models.Agenda, procedimentosExtras []uint) error {
+	var prof models.Usuario
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND clinica_id = ?", agenda.UsuarioID, agenda.ClinicaID).First(&prof).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("profissional não encontrado nesta clínica")
+		}
+		return err
+	}
+
+	var pac models.Paciente
+	if err := tx.Where("id = ? AND clinica_id = ?", agenda.PacienteID, agenda.ClinicaID).First(&pac).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("paciente não encontrado ou não pertence a esta clínica")
+		}
+		return err
+	}
+
+	var proc models.Procedimento
+	if err := tx.Where("id = ? AND clinica_id = ?", agenda.ProcedimentoID, agenda.ClinicaID).First(&proc).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("procedimento não encontrado ou não pertence a esta clínica")
+		}
+		return err
+	}
+
+	for _, pid := range procedimentosExtras {
+		var p models.Procedimento
+		if err := tx.Where("id = ? AND clinica_id = ?", pid, agenda.ClinicaID).First(&p).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("procedimento adicional não encontrado ou não pertence a esta clínica")
+			}
+			return err
+		}
+	}
+
+	duracao := duracaoNovaConsultaTx(tx, agenda.ClinicaID, agenda.ProcedimentoID, procedimentosExtras)
+
+	locSP := utils.LocSaoPaulo()
+	ah := agenda.DataHora.In(locSP)
+	now := time.Now().In(locSP)
+	nowMin := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, locSP)
+	if ah.Before(nowMin) {
+		return errors.New("não é permitido agendar em horário retroativo: escolha um horário igual ou posterior ao horário atual")
+	}
+
+	if err := validaHorarioNaGradeProfissional(tx, agenda.UsuarioID, agenda.DataHora, duracao); err != nil {
+		return err
+	}
+
+	if agenda.StatusAgendamentoID == 0 {
+		var st models.StatusAgendamento
+		if err := tx.Where("nome = ?", "Agendado").First(&st).Error; err != nil {
+			return errors.New("status padrão Agendado não encontrado")
+		}
+		agenda.StatusAgendamentoID = st.ID
+	}
+
+	var bloqueantes []uint
+	_ = tx.Model(&models.StatusAgendamento{}).Where("nome IN ?", []string{"Agendado", "Confirmado", "Em atendimento"}).Pluck("id", &bloqueantes).Error
+	if len(bloqueantes) == 0 {
+		bloqueantes = []uint{1, 2}
+	}
+	loc := agenda.DataHora.Location()
+	dayStart := time.Date(agenda.DataHora.Year(), agenda.DataHora.Month(), agenda.DataHora.Day(), 0, 0, 0, 0, loc)
+	dayEnd := dayStart.Add(24 * time.Hour)
+
+	var existentes []models.Agenda
+	if err := tx.Where(
+		"usuario_id = ? AND clinica_id = ? AND data_hora >= ? AND data_hora < ? AND status_agendamento_id IN ?",
+		agenda.UsuarioID, agenda.ClinicaID, dayStart, dayEnd, bloqueantes,
+	).Find(&existentes).Error; err != nil {
+		return err
+	}
+
+	newStart := agenda.DataHora
+	newEnd := newStart.Add(time.Duration(duracao) * time.Minute)
+	maxSim := maxPacientesEfetivo(prof.PermiteSimultaneo, prof.MaxPacientes)
+	if n := contarSobreposicoesAgenda(existentes, agenda.ClinicaID, tx, newStart, newEnd); n >= maxSim {
+		if maxSim <= 1 {
+			return ErrConflitoAgendamento
+		}
+		return ErrCapacidadeAgendaExcedida
+	}
+	return nil
+}
+
+func (r *agendaRepository) criarAgendaComTx(tx *gorm.DB, agenda *models.Agenda, procedimentosExtras []uint) error {
+	if err := r.validarPreCriacaoAgendaTx(tx, agenda, procedimentosExtras); err != nil {
+		return err
+	}
+	if err := tx.Create(agenda).Error; err != nil {
+		return err
+	}
+	for _, pid := range procedimentosExtras {
+		row := models.AgendaProcedimento{AgendaID: agenda.ID, ProcedimentoID: pid}
+		if err := tx.Create(&row).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *agendaRepository) Criar(agenda models.Agenda, procedimentosExtras []uint) (models.Agenda, error) {
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		var prof models.Usuario
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND clinica_id = ?", agenda.UsuarioID, agenda.ClinicaID).First(&prof).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("profissional não encontrado nesta clínica")
+		return r.criarAgendaComTx(tx, &agenda, procedimentosExtras)
+	})
+	return agenda, err
+}
+
+func (r *agendaRepository) VerificarSlotAgendamento(agenda models.Agenda, procedimentosExtras []uint) error {
+	tx := r.db.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	defer func() { _ = tx.Rollback() }()
+	a := agenda
+	return r.validarPreCriacaoAgendaTx(tx, &a, procedimentosExtras)
+}
+
+func (r *agendaRepository) CriarLote(itens []AgendaLoteItem) ([]models.Agenda, error) {
+	if len(itens) == 0 {
+		return nil, errors.New("informe ao menos um agendamento")
+	}
+	out := make([]models.Agenda, 0, len(itens))
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		for i := range itens {
+			a := itens[i].Agenda
+			if err := r.criarAgendaComTx(tx, &a, itens[i].ProcedimentosExtras); err != nil {
+				return fmt.Errorf("sessão %d: %w", i+1, err)
 			}
-			return err
-		}
-
-		var pac models.Paciente
-		if err := tx.Where("id = ? AND clinica_id = ?", agenda.PacienteID, agenda.ClinicaID).First(&pac).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("paciente não encontrado ou não pertence a esta clínica")
-			}
-			return err
-		}
-
-		var proc models.Procedimento
-		if err := tx.Where("id = ? AND clinica_id = ?", agenda.ProcedimentoID, agenda.ClinicaID).First(&proc).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("procedimento não encontrado ou não pertence a esta clínica")
-			}
-			return err
-		}
-
-		for _, pid := range procedimentosExtras {
-			var p models.Procedimento
-			if err := tx.Where("id = ? AND clinica_id = ?", pid, agenda.ClinicaID).First(&p).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return errors.New("procedimento adicional não encontrado ou não pertence a esta clínica")
-				}
-				return err
-			}
-		}
-
-		duracao := duracaoNovaConsultaTx(tx, agenda.ClinicaID, agenda.ProcedimentoID, procedimentosExtras)
-
-		locSP := utils.LocSaoPaulo()
-		ah := agenda.DataHora.In(locSP)
-		now := time.Now().In(locSP)
-		nowMin := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, locSP)
-		if ah.Before(nowMin) {
-			return errors.New("não é permitido agendar em horário retroativo: escolha um horário igual ou posterior ao horário atual")
-		}
-
-		if err := validaHorarioNaGradeProfissional(tx, agenda.UsuarioID, agenda.DataHora, duracao); err != nil {
-			return err
-		}
-
-		if agenda.StatusAgendamentoID == 0 {
-			var st models.StatusAgendamento
-			if err := tx.Where("nome = ?", "Agendado").First(&st).Error; err != nil {
-				return errors.New("status padrão Agendado não encontrado")
-			}
-			agenda.StatusAgendamentoID = st.ID
-		}
-
-		var bloqueantes []uint
-		_ = tx.Model(&models.StatusAgendamento{}).Where("nome IN ?", []string{"Agendado", "Confirmado", "Em atendimento"}).Pluck("id", &bloqueantes).Error
-		if len(bloqueantes) == 0 {
-			bloqueantes = []uint{1, 2}
-		}
-		loc := agenda.DataHora.Location()
-		dayStart := time.Date(agenda.DataHora.Year(), agenda.DataHora.Month(), agenda.DataHora.Day(), 0, 0, 0, 0, loc)
-		dayEnd := dayStart.Add(24 * time.Hour)
-
-		var existentes []models.Agenda
-		if err := tx.Where(
-			"usuario_id = ? AND clinica_id = ? AND data_hora >= ? AND data_hora < ? AND status_agendamento_id IN ?",
-			agenda.UsuarioID, agenda.ClinicaID, dayStart, dayEnd, bloqueantes,
-		).Find(&existentes).Error; err != nil {
-			return err
-		}
-
-		newStart := agenda.DataHora
-		newEnd := newStart.Add(time.Duration(duracao) * time.Minute)
-		maxSim := maxPacientesEfetivo(prof.PermiteSimultaneo, prof.MaxPacientes)
-		if n := contarSobreposicoesAgenda(existentes, agenda.ClinicaID, tx, newStart, newEnd); n >= maxSim {
-			if maxSim <= 1 {
-				return ErrConflitoAgendamento
-			}
-			return ErrCapacidadeAgendaExcedida
-		}
-
-		if err := tx.Create(&agenda).Error; err != nil {
-			return err
-		}
-		for _, pid := range procedimentosExtras {
-			row := models.AgendaProcedimento{AgendaID: agenda.ID, ProcedimentoID: pid}
-			if err := tx.Create(&row).Error; err != nil {
-				return err
-			}
+			out = append(out, a)
 		}
 		return nil
 	})
-	return agenda, err
+	return out, err
 }
 
 func (r *agendaRepository) Listar(clinicaID uint, dia *time.Time, usuarioID *uint) ([]models.Agenda, error) {
@@ -258,6 +308,27 @@ func (r *agendaRepository) Listar(clinicaID uint, dia *time.Time, usuarioID *uin
 	}
 
 	err := q.Order("data_hora asc").Find(&agendas).Error
+	return agendas, err
+}
+
+func (r *agendaRepository) ListarPassadosPorPaciente(clinicaID, pacienteID uint, limite int) ([]models.Agenda, error) {
+	if limite <= 0 || limite > 500 {
+		limite = 300
+	}
+	var agendas []models.Agenda
+	now := time.Now()
+	q := r.db.
+		Preload("Paciente", "clinica_id = ?", clinicaID).
+		Preload("Usuario", "clinica_id = ?", clinicaID).
+		Preload("Procedimento", "clinica_id = ?", clinicaID).
+		Preload("ProcedimentosExtras").
+		Preload("ProcedimentosExtras.Procedimento", "clinica_id = ?", clinicaID).
+		Preload("Convenio", "clinica_id = ?", clinicaID).
+		Preload("StatusAgendamento").
+		Where("clinica_id = ? AND paciente_id = ? AND data_hora < ?", clinicaID, pacienteID, now).
+		Order("data_hora DESC").
+		Limit(limite)
+	err := q.Find(&agendas).Error
 	return agendas, err
 }
 

@@ -6,6 +6,10 @@ import type {
   CriarLancamentoRequest,
   FiltrosFinanceiro,
   CustoFixo,
+  FechamentoPreviewResponse,
+  FechamentoListaItem,
+  FechamentoDetalheResponse,
+  CriarFechamentoRequest,
 } from "@/types/api"
 import { toast } from "sonner"
 
@@ -57,12 +61,17 @@ export const useCustosFixos = (ativos?: boolean) => {
     queryFn: async () => {
       const response = await apiClient.getCustosFixos(ativos)
       const raw = (response as { custos_fixos?: unknown[] }).custos_fixos ?? []
-      return (raw as CustoFixo[]).map((c) => ({
-        ...c,
-        id: String(c.id),
-        valor_mensal: Number(c.valor_mensal),
-        ativo: Boolean(c.ativo),
-      }))
+      return (raw as CustoFixo[]).map((c) => {
+        let dia = Number((c as { dia_previsto_pagamento?: number }).dia_previsto_pagamento)
+        if (!Number.isFinite(dia) || dia < 1 || dia > 31) dia = 1
+        return {
+          ...c,
+          id: String(c.id),
+          valor_mensal: Number(c.valor_mensal),
+          ativo: Boolean(c.ativo),
+          dia_previsto_pagamento: dia,
+        }
+      })
     },
     staleTime: 60 * 1000,
   })
@@ -71,7 +80,8 @@ export const useCustosFixos = (ativos?: boolean) => {
 export const useCriarCustoFixo = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (data: { descricao: string; valor_mensal: number }) => apiClient.criarCustoFixo(data),
+    mutationFn: (data: { descricao: string; valor_mensal: number; dia_previsto_pagamento?: number }) =>
+      apiClient.criarCustoFixo(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custos-fixos"] })
       queryClient.invalidateQueries({ queryKey: ["resumo-financeiro"] })
@@ -93,7 +103,7 @@ export const useAtualizarCustoFixo = () => {
       data,
     }: {
       id: string
-      data: { descricao: string; valor_mensal: number; ativo?: boolean }
+      data: { descricao: string; valor_mensal: number; ativo?: boolean; dia_previsto_pagamento?: number }
     }) => apiClient.atualizarCustoFixo(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custos-fixos"] })
@@ -104,6 +114,55 @@ export const useAtualizarCustoFixo = () => {
     onError: (error: unknown) => {
       const err = error as { message?: string }
       toast.error(err.message || "Erro ao atualizar custo fixo")
+    },
+  })
+}
+
+export const useFechamentoPreview = (dataInicio: string, dataFim: string, enabled: boolean) => {
+  const ok =
+    enabled &&
+    Boolean(dataInicio) &&
+    Boolean(dataFim) &&
+    dataInicio <= dataFim
+  return useQuery<FechamentoPreviewResponse>({
+    queryKey: ["fechamento-preview", dataInicio, dataFim],
+    enabled: ok,
+    queryFn: () => apiClient.getFechamentoPreview(dataInicio, dataFim),
+    staleTime: 30 * 1000,
+  })
+}
+
+export const useFechamentosFinanceirosList = (enabled: boolean) => {
+  return useQuery<FechamentoListaItem[]>({
+    queryKey: ["fechamentos-financeiros"],
+    enabled,
+    queryFn: () => apiClient.listFechamentosFinanceiros(),
+    staleTime: 60 * 1000,
+  })
+}
+
+export const useFechamentoFinanceiroDetalhe = (id: string | null, enabled: boolean) => {
+  return useQuery<FechamentoDetalheResponse>({
+    queryKey: ["fechamento-financeiro", id],
+    enabled: enabled && Boolean(id),
+    queryFn: () => apiClient.getFechamentoFinanceiro(id as string),
+  })
+}
+
+export const useCriarFechamentoFinanceiro = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CriarFechamentoRequest) => apiClient.criarFechamentoFinanceiro(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fechamentos-financeiros"] })
+      queryClient.invalidateQueries({ queryKey: ["fechamento-preview"] })
+      queryClient.invalidateQueries({ queryKey: ["lancamentos-financeiros"] })
+      queryClient.invalidateQueries({ queryKey: ["resumo-financeiro"] })
+      toast.success("Fechamento salvo com sucesso.")
+    },
+    onError: (error: unknown) => {
+      const err = error as { message?: string }
+      toast.error(err.message || "Erro ao salvar fechamento")
     },
   })
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ferrariwill/Clinicas/API/internal/especialidade"
 	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/middleware"
 	"github.com/ferrariwill/Clinicas/API/models"
@@ -102,12 +103,13 @@ func (cc *ClinicaController) Criar(c *gin.Context) {
 		nomeDono = "Administrador"
 	}
 	usuario := models.Usuario{
-		Nome:          nomeDono,
-		Email:         adminEmail,
-		Senha:         adminPassword,
-		Ativo:         true,
-		ClinicaID:     clinica.ID,
-		TipoUsuarioID: tipoUsuario.ID,
+		Nome:            nomeDono,
+		Email:           adminEmail,
+		Senha:           adminPassword,
+		Ativo:           true,
+		ClinicaID:       clinica.ID,
+		TipoUsuarioID:   tipoUsuario.ID,
+		Especialidade:   especialidade.Medico,
 	}
 	if err := cc.usuarioService.CriarUsuario(&usuario, clinica.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"erro": "Erro ao criar usuário admin"})

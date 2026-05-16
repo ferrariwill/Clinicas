@@ -16,7 +16,7 @@ import {
 } from "@/hooks/use-clinica-gestao"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, ModalActions, ModalButton } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -324,14 +324,14 @@ export default function GestaoPerfisPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenCriar(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenCriar(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={criar.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criar.isPending}>
                 Criar
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>
@@ -378,14 +378,14 @@ export default function GestaoPerfisPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setOpenEditar(false)}>
+              <ModalActions className="pt-2">
+                <ModalButton variant="danger" type="button" onClick={() => setOpenEditar(false)}>
                   Cancelar
-                </Button>
-                <Button type="submit" disabled={atualizar.isPending}>
+                </ModalButton>
+                <ModalButton variant="primary" type="submit" disabled={atualizar.isPending}>
                   Salvar
-                </Button>
-              </div>
+                </ModalButton>
+              </ModalActions>
             </form>
           )}
         </DialogContent>

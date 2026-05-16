@@ -112,3 +112,35 @@ func (cc *CobrancaController) RelatorioFinanceiro(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"recebimentos": rows})
 }
+
+func (cc *CobrancaController) RelatorioRepasseProfissionais(c *gin.Context) {
+	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"erro": err.Error()})
+		return
+	}
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if papel != rbac.PapelDono && papel != rbac.PapelADMGeral {
+		c.JSON(http.StatusForbidden, gin.H{"erro": "Apenas o dono da clínica (ou ADM) pode ver este relatório"})
+		return
+	}
+	var inicio, fim *time.Time
+	if s := c.Query("inicio"); s != "" {
+		if t, e := time.Parse("2006-01-02", s); e == nil {
+			inicio = &t
+		}
+	}
+	if s := c.Query("fim"); s != "" {
+		if t, e := time.Parse("2006-01-02", s); e == nil {
+			tt := t.Add(24*time.Hour - time.Nanosecond)
+			fim = &tt
+		}
+	}
+	incluirSemGateway := c.Query("incluir_sem_gateway") == "1"
+	linhas, detalhes, err := cc.svc.RelatorioRepasseProfissionais(clinicaID, inicio, fim, incluirSemGateway)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"erro": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"por_profissional": linhas, "detalhes": detalhes})
+}

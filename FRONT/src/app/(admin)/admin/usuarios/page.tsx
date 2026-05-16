@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription, ModalActions, ModalButton } from "@/components/ui/dialog"
 import {
   useAdminUsuarios,
   useAdminClinicas,
@@ -117,14 +117,14 @@ export default function AdminUsuariosPage() {
                 autoComplete="email"
               />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpenAdmin(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenAdmin(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={criarAdminPlataforma.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criarAdminPlataforma.isPending}>
                 {criarAdminPlataforma.isPending ? "Criando…" : "Criar"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

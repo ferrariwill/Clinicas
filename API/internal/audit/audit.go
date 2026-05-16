@@ -9,6 +9,9 @@ import (
 )
 
 const (
+	AcaoAtestadoCriar = "ATESTADO_CRIAR"
+	AcaoAtestadoLer   = "ATESTADO_LER"
+
 	AcaoProntuarioCriar     = "PRONTUARIO_CRIAR"
 	AcaoProntuarioAtualizar = "PRONTUARIO_ATUALIZAR"
 	AcaoProntuarioLer       = "PRONTUARIO_LER"

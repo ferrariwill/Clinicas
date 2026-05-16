@@ -35,6 +35,7 @@ func RunMigrations(db *gorm.DB) {
 		&models.Procedimento{},
 		&models.Convenio{},
 		&models.ClinicaConfiguracao{},
+		&models.FechamentoPeriodo{},
 		&models.LancamentoFinanceiro{},
 		&models.CustoFixo{},
 		&models.UsuarioHorario{},
@@ -45,6 +46,7 @@ func RunMigrations(db *gorm.DB) {
 		&models.Agenda{},
 		&models.AgendaProcedimento{},
 		&models.ProntuarioRegistro{},
+		&models.AtestadoMedico{},
 		&models.CobrancaConsulta{},
 	)
 
@@ -69,6 +71,24 @@ func RunMigrations(db *gorm.DB) {
 	ensureRotulosTelasMenu(db)
 	ensureTelaEquipeParaPerfisComModuloEquipe(db)
 	ensureTelaAtendimentosParaMedicosComAgenda(db)
+
+	ensureEspecialidadeUsuariosProfissionais(db)
+}
+
+// ensureEspecialidadeUsuariosProfissionais preenche MEDICO para donos/médicos legados sem especialidade.
+func ensureEspecialidadeUsuariosProfissionais(db *gorm.DB) {
+	err := db.Exec(`
+UPDATE usuarios AS u
+SET especialidade = 'MEDICO'
+FROM tipo_usuarios AS tu
+WHERE u.deleted_at IS NULL AND tu.deleted_at IS NULL
+  AND u.tipo_usuario_id = tu.id
+  AND UPPER(TRIM(tu.papel)) IN ('DONO', 'MEDICO')
+  AND (u.especialidade IS NULL OR TRIM(u.especialidade) = '')
+`).Error
+	if err != nil {
+		log.Printf("ensureEspecialidadeUsuariosProfissionais: %v", err)
+	}
 }
 
 // ensureRotulosTelasMenu atualiza nomes/descrições em bases já seedadas (seed só insere se rota não existir).
@@ -387,6 +407,7 @@ func seedCatalogoTelas(db *gorm.DB) {
 		{Nome: "Pagamentos — criar cobrança", Rota: "/clinicas/cobrancas", Descricao: "Pix/cartão (Asaas), dinheiro ou confirmação na recepção", Ativo: true},
 		{Nome: "Pagamentos — detalhe", Rota: "/clinicas/cobrancas/:id", Descricao: "Detalhe da cobrança", Ativo: true},
 		{Nome: "Pagamentos — relatório financeiro", Rota: "/clinicas/cobrancas/relatorio-financeiro", Descricao: "Recebimentos líquidos (dono)", Ativo: true},
+		{Nome: "Pagamentos — repasse profissionais", Rota: "/clinicas/cobrancas/relatorio-repasse-profissionais", Descricao: "Total a pagar por profissional (consultas pagas)", Ativo: true},
 		{Nome: "Agenda — liberar cobrança", Rota: "/clinicas/agenda/:id/liberar-cobranca", Descricao: "Médico libera para secretaria", Ativo: true},
 	}
 	for _, t := range catalogo {
@@ -415,7 +436,8 @@ func ensureCobrancaPermissoes(db *gorm.DB) {
 		}},
 		{rbac.PapelDono, []string{
 			"/clinicas/cobrancas/fila", "/clinicas/cobrancas", "/clinicas/cobrancas/:id",
-			"/clinicas/cobrancas/relatorio-financeiro", "/clinicas/agenda/:id/liberar-cobranca",
+			"/clinicas/cobrancas/relatorio-financeiro", "/clinicas/cobrancas/relatorio-repasse-profissionais",
+			"/clinicas/agenda/:id/liberar-cobranca",
 		}},
 	}
 	for _, e := range extras {

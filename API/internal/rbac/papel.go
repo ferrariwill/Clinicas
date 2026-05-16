@@ -42,3 +42,14 @@ func PodeAcessarFinanceiro(papel string) bool {
 		return false
 	}
 }
+
+// PodeCriarAgendamento indica quem pode criar ou pré-visualizar agendamentos (incluindo lote).
+// Médico não agenda: apenas secretaria ou dono da clínica montam a agenda.
+func PodeCriarAgendamento(papel string) bool {
+	switch papel {
+	case PapelSecretaria, PapelDono:
+		return true
+	default:
+		return false
+	}
+}

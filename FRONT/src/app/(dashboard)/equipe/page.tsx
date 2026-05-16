@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, ModalActions, ModalButton } from "@/components/ui/dialog"
 import {
   useTiposUsuarioClinica,
   useUsuariosClinica,
@@ -24,8 +24,21 @@ import { computeTelasLiberadas, useMinhasPermissoesRotas } from "@/hooks/use-min
 import type { UsuarioResponse } from "@/types/api"
 import { toast } from "sonner"
 import { apiClient } from "@/services/api-client"
+import {
+  ESPECIALIDADES_CLINICA,
+  labelEspecialidade,
+  tipoPapelExigeEspecialidade,
+} from "@/lib/clinica-especialidade"
 
-const empty = { nome: "", email: "", tipo_usuario_id: 0 }
+const empty = { nome: "", email: "", tipo_usuario_id: 0, especialidade: "MEDICO" as string, porcentagem_repasse: "0" }
+
+function parsePctRepasseInput(raw: string): { ok: true; value: number } | { ok: false } {
+  const t = raw.trim().replace(",", ".")
+  if (t === "") return { ok: true, value: 0 }
+  const n = Number(t)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return { ok: false }
+  return { ok: true, value: n }
+}
 
 const DIAS_SEMANA = [
   { dia: 0, nome: "Domingo" },
@@ -92,7 +105,14 @@ export default function EquipePage() {
   const [capPermiteSimultaneo, setCapPermiteSimultaneo] = useState(false)
   const [editing, setEditing] = useState<UsuarioResponse | null>(null)
   const [form, setForm] = useState(empty)
-  const [editForm, setEditForm] = useState({ nome: "", email: "", senha: "", tipo_usuario_id: 0 })
+  const [editForm, setEditForm] = useState({
+    nome: "",
+    email: "",
+    senha: "",
+    tipo_usuario_id: 0,
+    especialidade: "MEDICO",
+    porcentagem_repasse: "0",
+  })
   const { data: tipos, isLoading: loadingTipos } = useTiposUsuarioClinica()
   const { data: usuarios, isLoading: loadingUsers } = useUsuariosClinica(incluirInativos)
   const criar = useCriarUsuarioClinica()
@@ -170,8 +190,20 @@ export default function EquipePage() {
       toast.success("Grade e capacidade na agenda salvos.")
       setOpenHorarios(false)
     } catch (err: unknown) {
-      const e = err as { message?: string }
-      toast.error(e.message || "Erro ao salvar")
+      const e = err as {
+        message?: string
+        details?: string
+        response?: { data?: { error?: string; erro?: string; detalhes?: string } }
+      }
+      const api = e.response?.data
+      const msg =
+        (typeof e.details === "string" && e.details) ||
+        (typeof api?.detalhes === "string" && api.detalhes) ||
+        (typeof api?.erro === "string" && api.erro) ||
+        (typeof api?.error === "string" && api.error) ||
+        e.message ||
+        "Erro ao salvar"
+      toast.error(msg)
     }
   }
 
@@ -183,20 +215,43 @@ export default function EquipePage() {
       email: u.email,
       senha: "",
       tipo_usuario_id: u.tipo_usuario_id && u.tipo_usuario_id > 0 ? u.tipo_usuario_id : fallbackTipo,
+      especialidade: (u.especialidade || "MEDICO").toUpperCase(),
+      porcentagem_repasse:
+        u.porcentagem_repasse != null && Number.isFinite(u.porcentagem_repasse)
+          ? String(u.porcentagem_repasse)
+          : "0",
     })
     setOpenEdit(true)
   }
+
+  const papelDoForm = tiposSelect.find((t) => t.id === form.tipo_usuario_id)?.papel ?? ""
+  const exigeEspForm = tipoPapelExigeEspecialidade(papelDoForm)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.tipo_usuario_id) {
       return
     }
+    if (exigeEspForm && !form.especialidade.trim()) {
+      toast.error("Selecione a especialidade (Médico, Fisioterapeuta ou Dentista).")
+      return
+    }
+    let pctCreate: number | undefined
+    if (podeGerenciar) {
+      const pr = parsePctRepasseInput(form.porcentagem_repasse)
+      if (!pr.ok) {
+        toast.error("Porcentagem de repasse deve ser um número entre 0 e 100.")
+        return
+      }
+      pctCreate = pr.value
+    }
     criar.mutate(
       {
         nome: form.nome.trim(),
         email: form.email.trim(),
         tipo_usuario_id: form.tipo_usuario_id,
+        ...(exigeEspForm ? { especialidade: form.especialidade.trim().toUpperCase() } : {}),
+        ...(podeGerenciar && pctCreate !== undefined ? { porcentagem_repasse: pctCreate } : {}),
       },
       {
         onSuccess: () => {
@@ -207,17 +262,42 @@ export default function EquipePage() {
     )
   }
 
+  const papelEdit = tiposSelect.find((t) => t.id === editForm.tipo_usuario_id)?.papel ?? ""
+  const exigeEspEdit = tipoPapelExigeEspecialidade(papelEdit)
+
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!editing) return
     if (!editForm.tipo_usuario_id) return
-    const payload: { nome: string; email: string; tipo_usuario_id: number; senha?: string } = {
+    if (exigeEspEdit && !editForm.especialidade.trim()) {
+      toast.error("Selecione a especialidade.")
+      return
+    }
+    const payload: {
+      nome: string
+      email: string
+      tipo_usuario_id: number
+      senha?: string
+      especialidade?: string
+      porcentagem_repasse?: number
+    } = {
       nome: editForm.nome.trim(),
       email: editForm.email.trim(),
       tipo_usuario_id: editForm.tipo_usuario_id,
     }
     if (editForm.senha.trim().length > 0) {
       payload.senha = editForm.senha
+    }
+    if (exigeEspEdit) {
+      payload.especialidade = editForm.especialidade.trim().toUpperCase()
+    }
+    if (podeGerenciar) {
+      const pr = parsePctRepasseInput(editForm.porcentagem_repasse)
+      if (!pr.ok) {
+        toast.error("Porcentagem de repasse deve ser um número entre 0 e 100.")
+        return
+      }
+      payload.porcentagem_repasse = pr.value
     }
     atualizar.mutate(
       { id: editing.id, data: payload },
@@ -301,6 +381,11 @@ export default function EquipePage() {
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
                     {u.tipo_usuario || "—"}
                   </span>
+                  {tipoPapelExigeEspecialidade(u.papel ?? "") && (
+                    <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-medium text-sky-900">
+                      {labelEspecialidade(u.especialidade)}
+                    </span>
+                  )}
                   {podeGerenciar && (
                     <>
                       <Button
@@ -399,7 +484,17 @@ export default function EquipePage() {
                 id="tipo"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
                 value={form.tipo_usuario_id || ""}
-                onChange={(e) => setForm((p) => ({ ...p, tipo_usuario_id: Number(e.target.value) }))}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  const pap = tiposSelect.find((t) => t.id === id)?.papel ?? ""
+                  setForm((prev) => ({
+                    ...prev,
+                    tipo_usuario_id: id,
+                    especialidade: tipoPapelExigeEspecialidade(pap)
+                      ? prev.especialidade || "MEDICO"
+                      : "MEDICO",
+                  }))
+                }}
                 required
                 disabled={loadingTipos}
               >
@@ -411,14 +506,52 @@ export default function EquipePage() {
                 ))}
               </select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+            {exigeEspForm && (
+              <div className="space-y-1">
+                <Label htmlFor="esp" className="uppercase text-xs tracking-wide">
+                  Especialidade *
+                </Label>
+                <select
+                  id="esp"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  value={form.especialidade}
+                  onChange={(e) => setForm((p) => ({ ...p, especialidade: e.target.value }))}
+                  required
+                >
+                  {ESPECIALIDADES_CLINICA.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {podeGerenciar && (
+              <div className="space-y-1">
+                <Label htmlFor="repasse-novo" className="uppercase text-xs tracking-wide">
+                  Porcentagem de repasse (%)
+                </Label>
+                <Input
+                  id="repasse-novo"
+                  inputMode="decimal"
+                  placeholder="0 a 100 — sobre o valor bruto das consultas pagas"
+                  value={form.porcentagem_repasse}
+                  onChange={(e) => setForm((p) => ({ ...p, porcentagem_repasse: e.target.value }))}
+                />
+                <p className="text-xs text-slate-500">
+                  Percentual do valor bruto repassado ao profissional quando for o responsável na agenda (consultas
+                  liquidadas no relatório financeiro).
+                </p>
+              </div>
+            )}
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpen(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={criar.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criar.isPending}>
                 {criar.isPending ? "Salvando..." : "Criar"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>
@@ -540,14 +673,14 @@ export default function EquipePage() {
               <p className="text-xs text-slate-500">
                 Desmarque todos os dias e salve para remover a grade. Início deve ser antes do fim em cada dia marcado.
               </p>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" onClick={() => setOpenHorarios(false)}>
+              <ModalActions className="pt-2">
+                <ModalButton variant="danger" type="button" onClick={() => setOpenHorarios(false)}>
                   Cancelar
-                </Button>
-                <Button type="submit" disabled={salvarHorarios.isPending}>
+                </ModalButton>
+                <ModalButton variant="primary" type="submit" disabled={salvarHorarios.isPending}>
                   {salvarHorarios.isPending ? "Salvando…" : "Salvar grade e capacidade"}
-                </Button>
-              </div>
+                </ModalButton>
+              </ModalActions>
             </form>
           )}
         </DialogContent>
@@ -594,7 +727,17 @@ export default function EquipePage() {
                 id="edit-tipo"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
                 value={editForm.tipo_usuario_id || ""}
-                onChange={(e) => setEditForm((p) => ({ ...p, tipo_usuario_id: Number(e.target.value) }))}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  const pap = tiposSelect.find((t) => t.id === id)?.papel ?? ""
+                  setEditForm((prev) => ({
+                    ...prev,
+                    tipo_usuario_id: id,
+                    especialidade: tipoPapelExigeEspecialidade(pap)
+                      ? prev.especialidade || "MEDICO"
+                      : "MEDICO",
+                  }))
+                }}
                 required
                 disabled={loadingTipos}
               >
@@ -606,14 +749,45 @@ export default function EquipePage() {
                 ))}
               </select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpenEdit(false)}>
+            {exigeEspEdit && (
+              <div className="space-y-1">
+                <Label htmlFor="edit-esp">Especialidade *</Label>
+                <select
+                  id="edit-esp"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  value={editForm.especialidade}
+                  onChange={(e) => setEditForm((p) => ({ ...p, especialidade: e.target.value }))}
+                  required
+                >
+                  {ESPECIALIDADES_CLINICA.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {podeGerenciar && (
+              <div className="space-y-1">
+                <Label htmlFor="edit-repasse">Porcentagem de repasse (%)</Label>
+                <Input
+                  id="edit-repasse"
+                  inputMode="decimal"
+                  placeholder="0 a 100"
+                  value={editForm.porcentagem_repasse}
+                  onChange={(e) => setEditForm((p) => ({ ...p, porcentagem_repasse: e.target.value }))}
+                />
+                <p className="text-xs text-slate-500">Base de cálculo: valor bruto da cobrança paga (mesmo período do relatório de recebimentos).</p>
+              </div>
+            )}
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenEdit(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={atualizar.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={atualizar.isPending}>
                 {atualizar.isPending ? "Salvando..." : "Salvar"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

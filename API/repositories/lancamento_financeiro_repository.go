@@ -11,6 +11,10 @@ type LancamentoFinanceiroRepository interface {
 	Criar(l *models.LancamentoFinanceiro) error
 	Listar(clinicaID uint, inicio, fim *time.Time, categoria *string) ([]models.LancamentoFinanceiro, error)
 	Resumo(clinicaID uint, inicio, fim time.Time) (totalEntradas, totalSaidas float64, err error)
+	// ListarLivresParaFechamento retorna lançamentos no período ainda não vinculados a um fechamento.
+	ListarLivresParaFechamento(clinicaID uint, inicio, fim time.Time) ([]models.LancamentoFinanceiro, error)
+	// VincularFechamentoPeriodo associa lançamentos a um fechamento (sem hooks GORM).
+	VincularFechamentoPeriodo(tx *gorm.DB, clinicaID, fechamentoID uint, lancamentoIDs []uint) error
 }
 
 type lancamentoFinanceiroRepository struct {
@@ -52,4 +56,26 @@ func (r *lancamentoFinanceiroRepository) Resumo(clinicaID uint, inicio, fim time
 	).Row()
 	err = row.Scan(&totalEntradas, &totalSaidas)
 	return totalEntradas, totalSaidas, err
+}
+
+func (r *lancamentoFinanceiroRepository) ListarLivresParaFechamento(clinicaID uint, inicio, fim time.Time) ([]models.LancamentoFinanceiro, error) {
+	var rows []models.LancamentoFinanceiro
+	err := r.db.Where("clinica_id = ? AND deleted_at IS NULL AND data >= ? AND data <= ? AND fechamento_periodo_id IS NULL",
+		clinicaID, inicio, fim,
+	).Order("data asc, id asc").Find(&rows).Error
+	return rows, err
+}
+
+func (r *lancamentoFinanceiroRepository) VincularFechamentoPeriodo(tx *gorm.DB, clinicaID, fechamentoID uint, lancamentoIDs []uint) error {
+	if len(lancamentoIDs) == 0 {
+		return nil
+	}
+	db := tx
+	if db == nil {
+		db = r.db
+	}
+	return db.Session(&gorm.Session{SkipHooks: true}).
+		Model(&models.LancamentoFinanceiro{}).
+		Where("clinica_id = ? AND id IN ? AND fechamento_periodo_id IS NULL", clinicaID, lancamentoIDs).
+		Update("fechamento_periodo_id", fechamentoID).Error
 }

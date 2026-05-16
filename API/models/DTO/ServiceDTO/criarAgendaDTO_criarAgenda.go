@@ -13,6 +13,7 @@ func CriarAgendaDTO_CriarAgenda(d dto.CriarAgendaDTO, clinicaID uint, dataHora t
 		UsuarioID:           d.UsuarioID,
 		ClinicaID:           clinicaID,
 		ProcedimentoID:      d.ProcedimentoID,
+		ConvenioID:          d.ConvenioID,
 		DataHora:            dataHora,
 		Observacoes:         d.Observacoes,
 		StatusAgendamentoID: d.StatusID,

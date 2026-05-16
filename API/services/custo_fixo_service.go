@@ -9,8 +9,8 @@ import (
 
 type CustoFixoService interface {
 	Listar(clinicaID uint, soAtivos *bool) ([]models.CustoFixo, error)
-	Criar(clinicaID uint, descricao string, valorMensal float64) (models.CustoFixo, error)
-	Atualizar(clinicaID, id uint, descricao string, valorMensal float64, ativo bool) (models.CustoFixo, error)
+	Criar(clinicaID uint, descricao string, valorMensal float64, diaPrevistoPagamento int) (models.CustoFixo, error)
+	Atualizar(clinicaID, id uint, descricao string, valorMensal float64, ativo bool, diaPrevistoPagamento *int) (models.CustoFixo, error)
 }
 
 type custoFixoService struct {
@@ -25,15 +25,20 @@ func (s *custoFixoService) Listar(clinicaID uint, soAtivos *bool) ([]models.Cust
 	return s.repo.ListarPorClinica(clinicaID, soAtivos)
 }
 
-func (s *custoFixoService) Criar(clinicaID uint, descricao string, valorMensal float64) (models.CustoFixo, error) {
+func (s *custoFixoService) Criar(clinicaID uint, descricao string, valorMensal float64, diaPrevistoPagamento int) (models.CustoFixo, error) {
 	if descricao == "" || valorMensal <= 0 {
 		return models.CustoFixo{}, fmt.Errorf("descrição e valor mensal válidos são obrigatórios")
 	}
+	d := diaPrevistoPagamento
+	if d < 1 || d > 31 {
+		d = 1
+	}
 	c := models.CustoFixo{
-		ClinicaID:   clinicaID,
-		Descricao:   descricao,
-		ValorMensal: valorMensal,
-		Ativo:       true,
+		ClinicaID:            clinicaID,
+		Descricao:            descricao,
+		ValorMensal:          valorMensal,
+		Ativo:                true,
+		DiaPrevistoPagamento: uint(d),
 	}
 	if err := s.repo.Criar(&c); err != nil {
 		return models.CustoFixo{}, err
@@ -41,7 +46,7 @@ func (s *custoFixoService) Criar(clinicaID uint, descricao string, valorMensal f
 	return c, nil
 }
 
-func (s *custoFixoService) Atualizar(clinicaID, id uint, descricao string, valorMensal float64, ativo bool) (models.CustoFixo, error) {
+func (s *custoFixoService) Atualizar(clinicaID, id uint, descricao string, valorMensal float64, ativo bool, diaPrevistoPagamento *int) (models.CustoFixo, error) {
 	if descricao == "" || valorMensal <= 0 {
 		return models.CustoFixo{}, fmt.Errorf("descrição e valor mensal válidos são obrigatórios")
 	}
@@ -52,6 +57,13 @@ func (s *custoFixoService) Atualizar(clinicaID, id uint, descricao string, valor
 	ex.Descricao = descricao
 	ex.ValorMensal = valorMensal
 	ex.Ativo = ativo
+	if diaPrevistoPagamento != nil {
+		d := *diaPrevistoPagamento
+		if d < 1 || d > 31 {
+			d = 1
+		}
+		ex.DiaPrevistoPagamento = uint(d)
+	}
 	if err := s.repo.Atualizar(ex); err != nil {
 		return models.CustoFixo{}, err
 	}

@@ -53,9 +53,11 @@ func (ac AgendaController) Criar(c *gin.Context) {
 	}
 
 	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
-	uidTok, errUID := middleware.ExtrairDoToken[uint](c, "usuario_id")
-	if errUID == nil && papel == rbac.PapelMedico {
-		agendaDTO.UsuarioID = uidTok
+	if !rbac.PodeCriarAgendamento(papel) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"erro": "Agendamentos são feitos apenas pela secretaria ou pela gestão da clínica. Solicite o horário à recepção.",
+		})
+		return
 	}
 
 	ids := agendaDTO.ProcedimentoIDs
@@ -92,6 +94,73 @@ func (ac AgendaController) Criar(c *gin.Context) {
 	c.JSON(http.StatusCreated, agenda)
 }
 
+// PreviewLote projeta as próximas N sessões nos dias da semana e horário informados e valida cada slot (sem gravar).
+func (ac AgendaController) PreviewLote(c *gin.Context) {
+	var req dto.PreviewAgendaLoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos", "detalhes": err.Error()})
+		return
+	}
+
+	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if !rbac.PodeCriarAgendamento(papel) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"erro": "Prévia de lote é restrita à secretaria ou à gestão da clínica.",
+		})
+		return
+	}
+
+	sessoes, err := ac.service.PreviewAgendaLote(clinicaID, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"sessoes": sessoes})
+}
+
+// CriarLote grava vários agendamentos na mesma transação (lista final de data_hora por sessão).
+func (ac AgendaController) CriarLote(c *gin.Context) {
+	var req dto.CriarAgendaLoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos", "detalhes": err.Error()})
+		return
+	}
+
+	clinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if !rbac.PodeCriarAgendamento(papel) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"erro": "Agendamento em lote é restrito à secretaria ou à gestão da clínica.",
+		})
+		return
+	}
+
+	agendas, err := ac.service.CriarAgendaLote(clinicaID, req)
+	if err != nil {
+		if errors.Is(err, repositories.ErrConflitoAgendamento) || errors.Is(err, repositories.ErrCapacidadeAgendaExcedida) {
+			c.JSON(http.StatusConflict, gin.H{"erro": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+		return
+	}
+	for i := range agendas {
+		audit.Log(c.Request.Context(), audit.AcaoAgendamentoCriar, "agenda", agendas[i].ID)
+	}
+	c.JSON(http.StatusCreated, gin.H{"agendamentos": agendas, "total": len(agendas)})
+}
+
 // @Summary Listar agendamentos
 // @Description Lista todos os agendamentos da clínica
 // @Tags Agenda
@@ -120,6 +189,29 @@ func (ac AgendaController) Listar(c *gin.Context) {
 		if u, err := utils.StringParaUint(us); err == nil && u > 0 {
 			usuarioFiltro = &u
 		}
+	}
+
+	var pacienteTimeline *uint
+	if ps := c.Query("paciente_id"); ps != "" {
+		if p, err := utils.StringParaUint(ps); err == nil && p > 0 {
+			pacienteTimeline = &p
+		}
+	}
+
+	if pacienteTimeline != nil {
+		limite := 300
+		if ls := c.Query("limite"); ls != "" {
+			if n, err := strconv.Atoi(ls); err == nil && n > 0 && n <= 500 {
+				limite = n
+			}
+		}
+		agendas, err := ac.service.ListarPassadosPorPaciente(clinicaID, *pacienteTimeline, limite)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"erro": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"agendamentos": agendas})
+		return
 	}
 
 	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
@@ -342,9 +434,11 @@ func (ac AgendaController) HorariosDisponiveis(c *gin.Context) {
 	}
 
 	papel, _ := middleware.ExtrairDoToken[string](c, "papel")
-	meuID, errMe := middleware.ExtrairDoToken[uint](c, "usuario_id")
-	if errMe == nil && papel == rbac.PapelMedico {
-		usuarioID = meuID
+	if !rbac.PodeCriarAgendamento(papel) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"erro": "Consulta de horários livres é restrita à secretaria ou à gestão da clínica (para montar a agenda).",
+		})
+		return
 	}
 
 	procedimentoID, err := utils.StringParaUint(c.Query("procedimento_id"))

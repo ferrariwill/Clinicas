@@ -25,21 +25,25 @@ export default function LoginPage() {
     }
 
     setIsLoading(true)
-    const result = await login(email, senha)
+    try {
+      const result = await login(email, senha)
 
-    if (result.success) {
-      toast.success("LOGIN REALIZADO COM SUCESSO.")
-      const data = result.data as { usuario?: { obrigar_troca_senha?: boolean; tipo_usuario?: string; papel?: string } }
-      const obrigar = Boolean(data?.usuario?.obrigar_troca_senha)
-      if (obrigar) {
-        router.replace("/trocar-senha")
-        return
+      if (result.success) {
+        toast.success("LOGIN REALIZADO COM SUCESSO.")
+        const data = result.data as {
+          usuario?: { obrigar_troca_senha?: boolean; tipo_usuario?: string; papel?: string }
+        }
+        const obrigar = Boolean(data?.usuario?.obrigar_troca_senha)
+        if (obrigar) {
+          router.replace("/trocar-senha")
+          return
+        }
+        const papel = data?.usuario?.papel ?? data?.usuario?.tipo_usuario
+        router.push(papel === "ADM_GERAL" ? "/admin/dashboard" : "/dashboard")
       }
-      const papel = data?.usuario?.papel ?? data?.usuario?.tipo_usuario
-      router.push(papel === "ADM_GERAL" ? "/admin/dashboard" : "/dashboard")
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   return (

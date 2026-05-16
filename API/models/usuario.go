@@ -17,4 +17,8 @@ type Usuario struct {
 	MaxPacientes       int  `json:"max_pacientes" gorm:"default:1"`
 	// PermiteSimultaneo permite mais de um agendamento no mesmo horário (ex.: atendimentos em grupo).
 	PermiteSimultaneo bool `json:"permite_simultaneo" gorm:"default:false"`
+	// Especialidade: MEDICO | FISIOTERAPEUTA | DENTISTA — obrigatório para papéis DONO e MEDICO; vazio para demais.
+	Especialidade string `json:"especialidade" gorm:"size:24;default:''"`
+	// PorcentagemRepasse: 0–100; percentual do valor bruto da consulta paga repassado ao profissional da agenda.
+	PorcentagemRepasse float64 `json:"porcentagem_repasse" gorm:"default:0"`
 }

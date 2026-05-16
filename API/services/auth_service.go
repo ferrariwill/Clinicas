@@ -85,6 +85,15 @@ func (s *authService) Login(email string, senha string) (*models.Usuario, error)
 		return nil, ErrCredenciaisInvalidas
 	}
 
+	// Senhas antigas com custo bcrypt alto (ex.: 14) deixavam o login perceptivelmente lento; regravamos com custo atual após sucesso.
+	if cost, err := utils.SenhaHashCost(usuario.Senha); err == nil && cost > 12 {
+		if newHash, err := utils.HashSenha(senha); err == nil {
+			if err := s.usuarioRepo.AtualizarSenha(usuario.ID, newHash); err == nil {
+				usuario.Senha = newHash
+			}
+		}
+	}
+
 	if err := s.aplicarContextoClinicaNoLogin(usuario); err != nil {
 		return nil, err
 	}

@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, ModalActions, ModalButton } from "@/components/ui/dialog"
 import type { ProcedimentoRequest, ProcedimentoResponse } from "@/types/api"
+import { OPCOES_ESPECIALIDADE_PROCEDIMENTO, rotuloEspecialidadeProcedimento } from "@/lib/procedimentos-especialidade"
 import {
   useProcedimentos,
   useCriarProcedimento,
@@ -16,7 +17,7 @@ import {
   useReativarProcedimento,
 } from "@/hooks/use-agenda"
 
-const empty: ProcedimentoRequest = { nome: "", descricao: "", duracao_minutos: 30, valor: 0 }
+const empty: ProcedimentoRequest = { nome: "", descricao: "", duracao_minutos: 30, valor: 0, especialidade: "" }
 
 export default function ProcedimentosPage() {
   const { data: lista, isLoading } = useProcedimentos()
@@ -40,6 +41,7 @@ export default function ProcedimentosPage() {
       descricao: p.descricao ?? "",
       duracao_minutos: p.duracao_minutos,
       valor: p.valor,
+      especialidade: p.especialidade ?? "",
     })
     setOpenEdit(true)
   }
@@ -79,7 +81,8 @@ export default function ProcedimentosPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-slate-600">
-            Cadastre, edite ou desative itens do catálogo usados na agenda e nos atendimentos.
+            Cadastre, edite ou desative itens do catálogo usados na agenda e nos atendimentos. Opcionalmente restrinja cada
+            item a uma especialidade (ou deixe “Todas” para qualquer profissional).
           </p>
         </div>
         <Button onClick={() => setOpen(true)} className="gap-2 shrink-0">
@@ -105,6 +108,7 @@ export default function ProcedimentosPage() {
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="px-4 py-3 font-medium">Nome</th>
+                    <th className="px-4 py-3 font-medium">Especialidade</th>
                     <th className="px-4 py-3 font-medium">Duração (min)</th>
                     <th className="px-4 py-3 font-medium">Valor (R$)</th>
                     <th className="px-4 py-3 font-medium">Status</th>
@@ -120,6 +124,7 @@ export default function ProcedimentosPage() {
                           <div className="text-xs text-slate-500 line-clamp-1">{p.descricao}</div>
                         ) : null}
                       </td>
+                      <td className="px-4 py-3 text-slate-600">{rotuloEspecialidadeProcedimento(p.especialidade)}</td>
                       <td className="px-4 py-3 text-slate-700">{p.duracao_minutos}</td>
                       <td className="px-4 py-3 text-slate-700">
                         {p.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -177,8 +182,23 @@ export default function ProcedimentosPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogTitle>Novo procedimento</DialogTitle>
-          <DialogDescription>Preencha nome, duração e valor base.</DialogDescription>
+          <DialogDescription>Preencha nome, duração, valor e, se quiser, a especialidade atendida.</DialogDescription>
           <form onSubmit={handleCriar} className="space-y-4 pt-2">
+            <div>
+              <Label htmlFor="esp-proc">Especialidade</Label>
+              <select
+                id="esp-proc"
+                className="mt-1 flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-900"
+                value={form.especialidade ?? ""}
+                onChange={(e) => setForm((s) => ({ ...s, especialidade: e.target.value }))}
+              >
+                {OPCOES_ESPECIALIDADE_PROCEDIMENTO.map((o) => (
+                  <option key={o.value || "all"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <Label htmlFor="nome">Nome</Label>
               <Input
@@ -221,14 +241,14 @@ export default function ProcedimentosPage() {
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpen(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={criar.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criar.isPending}>
                 {criar.isPending ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>
@@ -238,6 +258,21 @@ export default function ProcedimentosPage() {
           <DialogTitle>Editar procedimento</DialogTitle>
           <DialogDescription>Altere os dados e salve.</DialogDescription>
           <form onSubmit={handleEditar} className="space-y-4 pt-2">
+            <div>
+              <Label htmlFor="eesp-proc">Especialidade</Label>
+              <select
+                id="eesp-proc"
+                className="mt-1 flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-900"
+                value={editForm.especialidade ?? ""}
+                onChange={(e) => setEditForm((s) => ({ ...s, especialidade: e.target.value }))}
+              >
+                {OPCOES_ESPECIALIDADE_PROCEDIMENTO.map((o) => (
+                  <option key={o.value || "all-e"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <Label htmlFor="enome">Nome</Label>
               <Input
@@ -282,14 +317,14 @@ export default function ProcedimentosPage() {
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenEdit(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={atualizar.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={atualizar.isPending}>
                 {atualizar.isPending ? "Salvando…" : "Salvar alterações"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

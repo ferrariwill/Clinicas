@@ -9,7 +9,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  ModalActions,
+  ModalButton,
+  modalIconProps,
+} from "@/components/ui/dialog"
 import { Calendar } from "@/components/ui/calendar"
 import { MetricCardSkeleton } from "@/components/ui/skeleton"
 import { format } from "date-fns"
@@ -313,15 +321,15 @@ export default function PacientesPage() {
           <div className="mt-4 flex justify-center">
             <Calendar selected={dataAgendar} onSelect={(d) => d && setDataAgendar(d)} />
           </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setOpenAgendarData(false)}>
+          <ModalActions className="mt-4">
+            <ModalButton variant="danger" type="button" onClick={() => setOpenAgendarData(false)}>
               Cancelar
-            </Button>
-            <Button type="button" onClick={confirmarIrAgenda} className="gap-2">
-              <CalendarPlus className="h-4 w-4" />
+            </ModalButton>
+            <ModalButton variant="primary" type="button" onClick={confirmarIrAgenda} className="inline-flex">
+              <CalendarPlus {...modalIconProps} />
               Ir para agenda
-            </Button>
-          </div>
+            </ModalButton>
+          </ModalActions>
         </DialogContent>
       </Dialog>
 
@@ -372,15 +380,15 @@ export default function PacientesPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpenCadastro(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenCadastro(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={criarPaciente.isPending} className="gap-2">
-                <Plus className="h-4 w-4" />
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criarPaciente.isPending} className="inline-flex">
+                <Plus {...modalIconProps} />
                 {criarPaciente.isPending ? "Salvando..." : "Cadastrar"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>
@@ -434,14 +442,14 @@ export default function PacientesPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpenEditar(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenEditar(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={atualizarPaciente.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={atualizarPaciente.isPending}>
                 {atualizarPaciente.isPending ? "Salvando..." : "Salvar alterações"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

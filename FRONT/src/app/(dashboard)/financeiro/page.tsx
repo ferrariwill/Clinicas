@@ -23,7 +23,15 @@ import { apiClient } from "@/services/api-client"
 import { LancamentoFinanceiro, FiltrosFinanceiro, ResumoFinanceiro, CustoFixo } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+  ModalActions,
+  ModalButton,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -39,6 +47,8 @@ import {
   EyeOff,
   Building2,
   Pencil,
+  UsersRound,
+  CalendarCheck2,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -56,6 +66,8 @@ const formatCurrency = (value: number) => {
     currency: 'BRL',
   }).format(value)
 }
+
+const DIAS_PREVISTO_PAGAMENTO = Array.from({ length: 31 }, (_, i) => i + 1)
 
 const canViewFullFinancials = (userType: string, userRole?: string | null) => {
   const r = userRole ?? ""
@@ -94,7 +106,7 @@ export default function FinanceiroPage() {
   const router = useRouter()
   const { usuario, userRole } = useAuth()
   const { data: permRotas, isSuccess: permissoesOk } = useMinhasPermissoesRotas()
-  const { podeFinanceiro, podeRelatorioRecebimentos } = useMemo(
+  const { podeFinanceiro, podeRelatorioRecebimentos, podeRelatorioRepasseProfissionais } = useMemo(
     () => computeTelasLiberadas(permissoesOk ? permRotas : undefined, userRole),
     [permRotas, userRole, permissoesOk]
   )
@@ -107,8 +119,8 @@ export default function FinanceiroPage() {
   const [openDialog, setOpenDialog] = useState(false)
   const [openCustoFixo, setOpenCustoFixo] = useState(false)
   const [editCusto, setEditCusto] = useState<CustoFixo | null>(null)
-  const [novoCusto, setNovoCusto] = useState({ descricao: "", valor: "" })
-  const [editForm, setEditForm] = useState({ descricao: "", valor: "", ativo: true })
+  const [novoCusto, setNovoCusto] = useState({ descricao: "", valor: "", diaPrevistoPagamento: 1 })
+  const [editForm, setEditForm] = useState({ descricao: "", valor: "", ativo: true, diaPrevistoPagamento: 1 })
   const [filtros, setFiltros] = useState<FiltrosFinanceiro>({})
   const [filtroInicioBR, setFiltroInicioBR] = useState("")
   const [filtroFimBR, setFiltroFimBR] = useState("")
@@ -249,8 +261,12 @@ export default function FinanceiroPage() {
       toast.error("Preencha descrição e valor mensal válidos")
       return
     }
-    await criarCustoFixo.mutateAsync({ descricao: novoCusto.descricao.trim(), valor_mensal: v })
-    setNovoCusto({ descricao: "", valor: "" })
+    await criarCustoFixo.mutateAsync({
+      descricao: novoCusto.descricao.trim(),
+      valor_mensal: v,
+      dia_previsto_pagamento: novoCusto.diaPrevistoPagamento,
+    })
+    setNovoCusto({ descricao: "", valor: "", diaPrevistoPagamento: 1 })
     setOpenCustoFixo(false)
   }
 
@@ -260,6 +276,7 @@ export default function FinanceiroPage() {
       descricao: c.descricao,
       valor: maskMoedaBRL(String(Math.round(c.valor_mensal * 100))),
       ativo: c.ativo,
+      diaPrevistoPagamento: c.dia_previsto_pagamento,
     })
   }
 
@@ -273,7 +290,12 @@ export default function FinanceiroPage() {
     }
     await atualizarCustoFixo.mutateAsync({
       id: editCusto.id,
-      data: { descricao: editForm.descricao.trim(), valor_mensal: v, ativo: editForm.ativo },
+      data: {
+        descricao: editForm.descricao.trim(),
+        valor_mensal: v,
+        ativo: editForm.ativo,
+        dia_previsto_pagamento: editForm.diaPrevistoPagamento,
+      },
     })
     setEditCusto(null)
   }
@@ -340,6 +362,29 @@ export default function FinanceiroPage() {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="cf-dia">Dia previsto de pagamento</Label>
+                    <Select
+                      value={String(novoCusto.diaPrevistoPagamento)}
+                      onValueChange={(v) =>
+                        setNovoCusto((p) => ({ ...p, diaPrevistoPagamento: Number.parseInt(v, 10) || 1 }))
+                      }
+                    >
+                      <SelectTrigger id="cf-dia">
+                        <SelectValue placeholder="Dia do mês" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {DIAS_PREVISTO_PAGAMENTO.map((d) => (
+                          <SelectItem key={d} value={String(d)}>
+                            Dia {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      No resumo do período, o valor entra só nos meses em que esse dia cai entre as datas do filtro.
+                    </p>
+                  </div>
+                  <div>
                     <Label htmlFor="cf-val">Valor mensal (R$)</Label>
                     <Input
                       id="cf-val"
@@ -350,14 +395,14 @@ export default function FinanceiroPage() {
                       required
                     />
                   </div>
-                  <div className="flex justify-end gap-3">
-                    <Button type="button" variant="secondary" onClick={() => setOpenCustoFixo(false)}>
+                  <ModalActions>
+                    <ModalButton variant="danger" type="button" onClick={() => setOpenCustoFixo(false)}>
                       Cancelar
-                    </Button>
-                    <Button type="submit" disabled={criarCustoFixo.isPending}>
+                    </ModalButton>
+                    <ModalButton variant="primary" type="submit" disabled={criarCustoFixo.isPending}>
                       {criarCustoFixo.isPending ? "Salvando..." : "Salvar"}
-                    </Button>
-                  </div>
+                    </ModalButton>
+                  </ModalActions>
                 </form>
               </DialogContent>
             </Dialog>
@@ -458,19 +503,53 @@ export default function FinanceiroPage() {
                   />
                 </div>
 
-                <div className="flex justify-end gap-3">
-                  <Button type="button" variant="secondary" onClick={() => setOpenDialog(false)}>
+                <ModalActions>
+                  <ModalButton variant="danger" type="button" onClick={() => setOpenDialog(false)}>
                     Cancelar
-                  </Button>
-                  <Button type="submit" disabled={criarLancamento.isPending}>
+                  </ModalButton>
+                  <ModalButton variant="primary" type="submit" disabled={criarLancamento.isPending}>
                     {criarLancamento.isPending ? "Salvando..." : "Salvar"}
-                  </Button>
-                </div>
+                  </ModalButton>
+                </ModalActions>
               </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
+
+      {(podeRelatorioRepasseProfissionais || podeVerTudo) && (
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold tracking-tight text-slate-900">Fechamento e repasses</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Consolide um período com auditoria ou consulte totais de repasse sobre consultas pagas.
+              </p>
+            </div>
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end lg:w-auto lg:shrink-0">
+              {podeRelatorioRepasseProfissionais && (
+                <Button asChild variant="outline" className="w-full justify-center gap-2 sm:w-auto">
+                  <Link href="/financeiro/repasse-profissionais">
+                    <UsersRound className="h-4 w-4 shrink-0" aria-hidden />
+                    Repasse aos profissionais
+                  </Link>
+                </Button>
+              )}
+              {podeVerTudo && (
+                <Button
+                  asChild
+                  className="w-full justify-center gap-2 bg-sky-700 text-white hover:bg-sky-800 sm:w-auto"
+                >
+                  <Link href="/financeiro/fechamento/novo">
+                    <CalendarCheck2 className="h-4 w-4 shrink-0" aria-hidden />
+                    Novo fechamento de período
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Resumo Financeiro */}
       <div
@@ -541,8 +620,9 @@ export default function FinanceiroPage() {
                         {formatCurrency(totaisVisiveis?.custosFixosNoPeriodo ?? 0)}
                       </p>
                       <p className="mt-1 text-xs text-slate-600">
-                        Base mensal {formatCurrency(totaisVisiveis?.custosFixosMensal ?? 0)} ×{" "}
-                        {totaisVisiveis?.mesesNoPeriodo ?? 1} mes(es)
+                        Soma dos vencimentos que caem no período (cada custo ativo no dia do mês cadastrado). Referência:
+                        base mensal {formatCurrency(totaisVisiveis?.custosFixosMensal ?? 0)} ·{" "}
+                        {totaisVisiveis?.mesesNoPeriodo ?? 1} mês(es) no intervalo
                       </p>
                     </div>
                   </div>
@@ -719,8 +799,9 @@ export default function FinanceiroPage() {
               Custos fixos mensais
             </CardTitle>
             <p className="text-sm text-slate-600">
-              Valores recorrentes (aluguel, internet, etc.) entram automaticamente no resumo e no saldo do período
-              filtrado.
+              Valores recorrentes (aluguel, internet, etc.): informe o dia previsto de pagamento. No resumo, cada item
+              entra apenas nos meses em que essa data cai dentro do período filtrado (útil para fechamento parcial ou
+              mês cheio).
             </p>
           </CardHeader>
           <CardContent>
@@ -734,6 +815,7 @@ export default function FinanceiroPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Descrição</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Dia pag.</TableHead>
                       <TableHead className="text-right">Valor mensal</TableHead>
                       <TableHead>Ativo</TableHead>
                       <TableHead className="text-right w-[100px]">Ações</TableHead>
@@ -743,6 +825,9 @@ export default function FinanceiroPage() {
                     {(custosFixos ?? []).map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="max-w-[200px] truncate font-medium">{c.descricao}</TableCell>
+                        <TableCell className="text-center tabular-nums text-slate-700">
+                          {c.dia_previsto_pagamento}
+                        </TableCell>
                         <TableCell className="text-right whitespace-nowrap">
                           {formatCurrency(c.valor_mensal)}
                         </TableCell>
@@ -829,7 +914,7 @@ export default function FinanceiroPage() {
       <Dialog open={!!editCusto} onOpenChange={(o) => !o && setEditCusto(null)}>
         <DialogContent className="max-w-md">
           <DialogTitle>Editar custo fixo</DialogTitle>
-          <DialogDescription>Altere o valor mensal ou desative o item.</DialogDescription>
+          <DialogDescription>Altere valor, dia de pagamento ou desative o item.</DialogDescription>
           {editCusto && (
             <form onSubmit={handleSalvarEdicaoCusto} className="mt-4 space-y-4">
               <div>
@@ -840,6 +925,26 @@ export default function FinanceiroPage() {
                   onChange={(e) => setEditForm((p) => ({ ...p, descricao: e.target.value }))}
                   required
                 />
+              </div>
+              <div>
+                <Label htmlFor="ed-dia">Dia previsto de pagamento</Label>
+                <Select
+                  value={String(editForm.diaPrevistoPagamento)}
+                  onValueChange={(v) =>
+                    setEditForm((p) => ({ ...p, diaPrevistoPagamento: Number.parseInt(v, 10) || 1 }))
+                  }
+                >
+                  <SelectTrigger id="ed-dia">
+                    <SelectValue placeholder="Dia do mês" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {DIAS_PREVISTO_PAGAMENTO.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        Dia {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="ed-val">Valor mensal (R$)</Label>
@@ -863,14 +968,14 @@ export default function FinanceiroPage() {
                   Custo ativo (entra no resumo)
                 </Label>
               </div>
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={() => setEditCusto(null)}>
+              <ModalActions>
+                <ModalButton variant="danger" type="button" onClick={() => setEditCusto(null)}>
                   Cancelar
-                </Button>
-                <Button type="submit" disabled={atualizarCustoFixo.isPending}>
+                </ModalButton>
+                <ModalButton variant="primary" type="submit" disabled={atualizarCustoFixo.isPending}>
                   {atualizarCustoFixo.isPending ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
+                </ModalButton>
+              </ModalActions>
             </form>
           )}
         </DialogContent>

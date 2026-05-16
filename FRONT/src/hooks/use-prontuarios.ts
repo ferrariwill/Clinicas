@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { differenceInHours, isValid, parseISO } from "date-fns"
 import { apiClient } from "@/services/api-client"
-import type { ProntuarioRegistroSwagger, CriarProntuarioRequest, AtualizarProntuarioRequest } from "@/types/api"
+import type { ProntuarioRegistroSwagger, CriarProntuarioRequest, AtualizarProntuarioRequest, PlanoTratamentoRequest } from "@/types/api"
 import { toast } from "sonner"
 
 function mapProntuarioRegistroFromAPI(raw: Record<string, unknown>): ProntuarioRegistroSwagger {
@@ -91,6 +91,34 @@ export const useAtualizarProntuario = () => {
     onError: (error: unknown) => {
       const err = error as { message?: string }
       toast.error(err?.message || "Erro ao atualizar prontuário")
+    },
+  })
+}
+
+export const useRegistrarPlanoTratamento = (pacienteId: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: PlanoTratamentoRequest) => apiClient.registrarPlanoTratamento(payload),
+    onSuccess: (data) => {
+      const raw = data as { aviso?: string; informar_secretaria?: string }
+      const msg = (typeof raw.informar_secretaria === "string" && raw.informar_secretaria.trim()
+        ? raw.informar_secretaria
+        : typeof raw.aviso === "string"
+          ? raw.aviso.trim()
+          : "") as string
+      toast.success("Plano de tratamento registrado no prontuário.")
+      if (msg) {
+        toast.warning(msg, { duration: 14000 })
+      }
+      queryClient.invalidateQueries({ queryKey: ["prontuarios-paciente", pacienteId] })
+      queryClient.invalidateQueries({ queryKey: ["prontuarios-paciente"] })
+      queryClient.invalidateQueries({ queryKey: ["pacientes"] })
+      queryClient.invalidateQueries({ queryKey: ["agenda-dia"] })
+      queryClient.invalidateQueries({ queryKey: ["agenda-paciente-passados", pacienteId] })
+    },
+    onError: (error: unknown) => {
+      const err = error as { message?: string }
+      toast.error(err?.message || "Erro ao registrar plano de tratamento")
     },
   })
 }

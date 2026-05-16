@@ -43,8 +43,14 @@ export const useUsuariosClinica = (incluirInativos = false) =>
 export const useCriarUsuarioClinica = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { nome: string; email: string; senha?: string; tipo_usuario_id: number }) =>
-      apiClient.criarUsuarioClinica(data),
+    mutationFn: (data: {
+      nome: string
+      email: string
+      senha?: string
+      tipo_usuario_id: number
+      especialidade?: string
+      porcentagem_repasse?: number
+    }) => apiClient.criarUsuarioClinica(data),
     onSuccess: (res: unknown) => {
       const r = res as { email_enviado?: boolean }
       if (r?.email_enviado) {
@@ -74,6 +80,8 @@ export const useAtualizarUsuarioClinica = () => {
         tipo_usuario_id?: number
         max_pacientes?: number
         permite_simultaneo?: boolean
+        especialidade?: string
+        porcentagem_repasse?: number
       }
     }) => apiClient.atualizarUsuario(args.id, args.data),
     onSuccess: () => {

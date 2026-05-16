@@ -4,7 +4,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import Cookies from "js-cookie";
-import { ErrorResponse, ClinicaRequest, PacienteRequest, AgendaRequest, CriarProntuarioRequest, AtualizarProntuarioRequest, ProcedimentoRequest, ConvenioRequest, UsuarioRequest, DefinirHorariosUsuarioRequest, CriarLancamentoRequest, FiltrosFinanceiro, MinhaClinicaAuth } from "@/types/api";
+import { ErrorResponse, ClinicaRequest, PacienteRequest, AgendaRequest, PreviewAgendaLoteRequest, PreviewAgendaLoteSessao, CriarAgendaLoteRequest, CriarProntuarioRequest, AtualizarProntuarioRequest, PlanoTratamentoRequest, CriarAtestadoRequest, ProcedimentoRequest, ConvenioRequest, UsuarioRequest, DefinirHorariosUsuarioRequest, CriarLancamentoRequest, FiltrosFinanceiro, MinhaClinicaAuth, FechamentoPreviewResponse, FechamentoListaItem, FechamentoDetalheResponse, CriarFechamentoRequest } from "@/types/api";
 
 function normalizeApiBaseURL(raw: string): string {
   return raw.trim().replace(/\/+$/, "");
@@ -13,6 +13,25 @@ function normalizeApiBaseURL(raw: string): string {
 const API_BASE_URL = normalizeApiBaseURL(
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
 );
+
+/** IDs de procedimento(s) para agenda: primeiro é o principal, demais extras (mesma regra do POST /agenda). */
+function procedimentoIdsFromAgendaSelection(data: {
+  procedimento_id?: string;
+  procedimento_ids?: string[];
+}): number[] {
+  const fromMulti = (data.procedimento_ids ?? [])
+    .map((x) => Number(String(x).trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const single = data.procedimento_id?.trim() ? Number(String(data.procedimento_id).trim()) : NaN;
+  let ordered: number[] = [];
+  if (Number.isFinite(single) && single > 0) {
+    ordered = [single, ...fromMulti.filter((x) => x !== single)];
+  } else {
+    ordered = [...fromMulti];
+  }
+  const seen = new Set<number>();
+  return ordered.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
+}
 
 const API_TIMEOUT_MS = (() => {
   const n = Number.parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "", 10);
@@ -248,18 +267,7 @@ class ApiClient {
   }
 
   async criarAgenda(data: AgendaRequest) {
-    const fromMulti = (data.procedimento_ids ?? [])
-      .map((x) => Number(String(x).trim()))
-      .filter((n) => Number.isFinite(n) && n > 0)
-    const single = data.procedimento_id?.trim() ? Number(String(data.procedimento_id).trim()) : NaN
-    let ordered: number[] = []
-    if (Number.isFinite(single) && single > 0) {
-      ordered = [single, ...fromMulti.filter((x) => x !== single)]
-    } else {
-      ordered = [...fromMulti]
-    }
-    const seen = new Set<number>()
-    const unique = ordered.filter((id) => (seen.has(id) ? false : (seen.add(id), true)))
+    const unique = procedimentoIdsFromAgendaSelection(data)
     if (unique.length === 0) {
       throw new Error("Selecione ao menos um procedimento")
     }
@@ -283,6 +291,72 @@ class ApiClient {
       body.procedimento_id = unique[0]
     }
     const response = await this.axiosInstance.post("/clinicas/agenda", body);
+    return response.data;
+  }
+
+  async previewAgendaLote(data: PreviewAgendaLoteRequest): Promise<{ sessoes: PreviewAgendaLoteSessao[] }> {
+    const unique = procedimentoIdsFromAgendaSelection(data);
+    if (unique.length === 0) {
+      throw new Error("Selecione ao menos um procedimento");
+    }
+    const pid = Number.parseInt(String(data.paciente_id ?? "").trim(), 10);
+    const uid = Number.parseInt(String(data.usuario_id ?? "").trim(), 10);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      throw new Error("Selecione um paciente válido (id ausente ou inválido).");
+    }
+    if (!Number.isFinite(uid) || uid <= 0) {
+      throw new Error("Selecione um profissional válido.");
+    }
+    const q = Number(data.quantidade_sessoes);
+    if (!Number.isFinite(q) || q < 1 || q > 100) {
+      throw new Error("Quantidade de sessões deve ser entre 1 e 100.");
+    }
+    const body: Record<string, unknown> = {
+      paciente_id: pid,
+      usuario_id: uid,
+      quantidade_sessoes: q,
+      dias_semana: data.dias_semana,
+      hora: data.hora.trim(),
+      data_referencia: data.data_referencia.trim(),
+    };
+    if (unique.length > 1) {
+      body.procedimento_id = unique[0];
+      body.procedimento_ids = unique;
+    } else {
+      body.procedimento_id = unique[0];
+    }
+    const response = await this.axiosInstance.post("/clinicas/agenda/lote/preview", body);
+    return response.data as { sessoes: PreviewAgendaLoteSessao[] };
+  }
+
+  async criarAgendaLote(data: CriarAgendaLoteRequest) {
+    const unique = procedimentoIdsFromAgendaSelection(data);
+    if (unique.length === 0) {
+      throw new Error("Selecione ao menos um procedimento");
+    }
+    const pid = Number.parseInt(String(data.paciente_id ?? "").trim(), 10);
+    const uid = Number.parseInt(String(data.usuario_id ?? "").trim(), 10);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      throw new Error("Selecione um paciente válido (id ausente ou inválido).");
+    }
+    if (!Number.isFinite(uid) || uid <= 0) {
+      throw new Error("Selecione um profissional válido.");
+    }
+    if (!data.sessoes?.length) {
+      throw new Error("Gere a prévia do lote ou informe as sessões.");
+    }
+    const body: Record<string, unknown> = {
+      paciente_id: pid,
+      usuario_id: uid,
+      sessoes: data.sessoes.map((s) => ({ data_hora: s.data_hora })),
+    };
+    if (unique.length > 1) {
+      body.procedimento_id = unique[0];
+      body.procedimento_ids = unique;
+    } else {
+      body.procedimento_id = unique[0];
+    }
+    const response = await this.axiosInstance.post("/clinicas/agenda/lote", body);
     return response.data;
   }
 
@@ -317,6 +391,20 @@ class ApiClient {
       params,
     })
 
+    return response.data.agendamentos ?? response.data
+  }
+
+  /** Agendamentos já realizados (data/hora &lt; agora) do paciente, para linha do tempo do prontuário. Não envie `data`. */
+  async getAgendamentosPassadosPaciente(pacienteId: string, limite?: number) {
+    const pid = Number.parseInt(String(pacienteId ?? "").trim(), 10)
+    if (!Number.isFinite(pid) || pid <= 0) {
+      throw new Error("Paciente inválido.")
+    }
+    const params: Record<string, string> = { paciente_id: String(pid) }
+    if (limite != null && limite > 0) {
+      params.limite = String(Math.min(500, Math.floor(limite)))
+    }
+    const response = await this.axiosInstance.get("/clinicas/agenda", { params })
     return response.data.agendamentos ?? response.data
   }
 
@@ -379,6 +467,15 @@ class ApiClient {
     return response.data as { recebimentos?: unknown[] }
   }
 
+  async getRelatorioRepasseProfissionais(inicio?: string, fim?: string, opts?: { incluirSemGateway?: boolean }) {
+    const params: Record<string, string | undefined> = { inicio, fim }
+    if (opts?.incluirSemGateway) {
+      params.incluir_sem_gateway = "1"
+    }
+    const response = await this.axiosInstance.get("/clinicas/cobrancas/relatorio-repasse-profissionais", { params })
+    return response.data as { por_profissional?: unknown[]; detalhes?: unknown[] }
+  }
+
   // Medical records endpoints
   async getProntuarios(pacienteId: string) {
     const response = await this.axiosInstance.get("/clinicas/prontuarios", {
@@ -411,16 +508,84 @@ class ApiClient {
     return response.data
   }
 
+  async registrarPlanoTratamento(data: PlanoTratamentoRequest) {
+    const body: Record<string, unknown> = {
+      modo: data.modo,
+      paciente_id: data.paciente_id,
+      usuario_id: data.usuario_id,
+      procedimento_id: data.procedimento_id,
+      data_hora: data.data_hora,
+    }
+    if (data.sessoes_previstas != null && Number.isFinite(data.sessoes_previstas)) {
+      body.sessoes_previstas = data.sessoes_previstas
+    }
+    if (data.intervalo_dias != null && Number.isFinite(data.intervalo_dias) && data.intervalo_dias > 0) {
+      body.intervalo_dias = data.intervalo_dias
+    }
+    if (data.observacoes && data.observacoes.trim()) {
+      body.observacoes = data.observacoes.trim()
+    }
+    const response = await this.axiosInstance.post("/clinicas/plano-tratamento", body)
+    return response.data as { prontuario_id?: number; agendas?: unknown[]; aviso?: string }
+  }
+
+  async getAtestados(pacienteId: string) {
+    const response = await this.axiosInstance.get("/clinicas/atestados", {
+      params: { paciente_id: pacienteId },
+    })
+    return response.data
+  }
+
+  async criarAtestado(data: CriarAtestadoRequest) {
+    const pid = Number.parseInt(String(data.paciente_id ?? "").trim(), 10)
+    if (!Number.isFinite(pid) || pid <= 0) {
+      throw new Error("Paciente inválido para o atestado.")
+    }
+    const q = Math.floor(Number(data.quantidade))
+    if (!Number.isFinite(q) || q < 1 || q > 999) {
+      throw new Error("Quantidade deve ser entre 1 e 999.")
+    }
+    const cid = (data.cid10 ?? "").trim()
+    if (!cid) {
+      throw new Error("CID-10 é obrigatório.")
+    }
+    const ini = (data.consulta_hora_inicio ?? "").trim()
+    const fim = (data.consulta_hora_fim ?? "").trim()
+    if ((ini && !fim) || (!ini && fim)) {
+      throw new Error("Preencha hora de início e fim da consulta, ou deixe os dois em branco.")
+    }
+    const horaRe = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+    if (ini && fim && (!horaRe.test(ini) || !horaRe.test(fim))) {
+      throw new Error("Horários da consulta: use formato 24h HH:MM (ex.: 08:30).")
+    }
+    const body: Record<string, unknown> = {
+      paciente_id: pid,
+      tipo: data.tipo,
+      quantidade: q,
+      cid10: cid,
+    }
+    if (ini && fim) {
+      body.consulta_hora_inicio = ini
+      body.consulta_hora_fim = fim
+    }
+    const response = await this.axiosInstance.post("/clinicas/atestados", body)
+    return response.data
+  }
+
   // Procedures endpoints
-  async getProcedimentos(ativas?: boolean) {
+  async getProcedimentos(ativas?: boolean, especialidade?: string) {
+    const params: Record<string, string> = {}
+    if (ativas !== undefined) params.ativas = String(ativas)
+    const esp = (especialidade ?? "").trim().toUpperCase()
+    if (esp) params.especialidade = esp
     const response = await this.axiosInstance.get("/procedimentos", {
-      params: ativas === undefined ? undefined : { ativas: String(ativas) },
+      params: Object.keys(params).length ? params : undefined,
     });
     return response.data;
   }
 
   async criarProcedimento(data: ProcedimentoRequest, opts?: { convenio_id?: number; ativo?: boolean }) {
-    const body = {
+    const body: Record<string, unknown> = {
       nome: data.nome,
       descricao: data.descricao ?? "",
       preco: data.valor,
@@ -428,6 +593,8 @@ class ApiClient {
       convenio_id: opts?.convenio_id ?? 0,
       ativo: opts?.ativo !== false,
     }
+    const e = (data.especialidade ?? "").trim().toUpperCase()
+    if (e) body.especialidade = e
     const response = await this.axiosInstance.post("/procedimentos", body);
     return response.data;
   }
@@ -437,7 +604,7 @@ class ApiClient {
     data: ProcedimentoRequest,
     opts?: { convenio_id?: number; ativo?: boolean }
   ) {
-    const body = {
+    const body: Record<string, unknown> = {
       nome: data.nome,
       descricao: data.descricao ?? "",
       preco: data.valor,
@@ -445,6 +612,9 @@ class ApiClient {
       convenio_id: opts?.convenio_id ?? 0,
       ativo: opts?.ativo !== false,
     }
+    const e = (data.especialidade ?? "").trim().toUpperCase()
+    if (e) body.especialidade = e
+    else body.especialidade = ""
     const response = await this.axiosInstance.put(`/procedimentos/${id}`, body);
     return response.data;
   }
@@ -563,11 +733,19 @@ class ApiClient {
     email: string;
     senha?: string;
     tipo_usuario_id: number;
+    especialidade?: string;
+    porcentagem_repasse?: number;
   }) {
     const body: Record<string, unknown> = {
       nome: data.nome,
       email: data.email,
       tipo_usuario_id: data.tipo_usuario_id,
+    }
+    if (data.porcentagem_repasse != null && Number.isFinite(data.porcentagem_repasse)) {
+      body.porcentagem_repasse = data.porcentagem_repasse
+    }
+    if (data.especialidade && data.especialidade.trim()) {
+      body.especialidade = data.especialidade.trim().toUpperCase()
     }
     if (data.senha && data.senha.trim().length > 0) {
       body.senha = data.senha
@@ -590,6 +768,8 @@ class ApiClient {
       tipo_usuario_id?: number;
       max_pacientes?: number;
       permite_simultaneo?: boolean;
+      especialidade?: string;
+      porcentagem_repasse?: number;
     }
   ) {
     const response = await this.axiosInstance.put(`/usuarios/${usuarioId}`, data);
@@ -653,6 +833,16 @@ class ApiClient {
     return response.data;
   }
 
+  async getMedicoDashboardClinico(semanas?: number, clinicId?: string) {
+    const headers: Record<string, string> = {};
+    if (clinicId) headers["x-clinic-id"] = clinicId;
+    const response = await this.axiosInstance.get("/clinicas/me/dashboard-clinico", {
+      headers: Object.keys(headers).length ? headers : undefined,
+      params: semanas != null && semanas > 0 ? { semanas } : undefined,
+    });
+    return response.data;
+  }
+
   // Financial endpoints
   async abrirFinanceiro() {
     const response = await this.axiosInstance.get("/financeiro/abrir");
@@ -682,6 +872,31 @@ class ApiClient {
     return response.data;
   }
 
+  async getFechamentoPreview(dataInicio: string, dataFim: string) {
+    const response = await this.axiosInstance.get("/clinicas/financeiro/fechamento/preview", {
+      params: { dataInicio, dataFim },
+    });
+    return response.data as FechamentoPreviewResponse;
+  }
+
+  async listFechamentosFinanceiros() {
+    const response = await this.axiosInstance.get("/clinicas/financeiro/fechamento");
+    return (Array.isArray(response.data) ? response.data : []) as FechamentoListaItem[];
+  }
+
+  async getFechamentoFinanceiro(id: string) {
+    const response = await this.axiosInstance.get(`/clinicas/financeiro/fechamento/${id}`);
+    return response.data as FechamentoDetalheResponse;
+  }
+
+  async criarFechamentoFinanceiro(body: CriarFechamentoRequest) {
+    const response = await this.axiosInstance.post("/clinicas/financeiro/fechamento", {
+      dataInicio: body.dataInicio,
+      dataFim: body.dataFim,
+    });
+    return response.data as FechamentoDetalheResponse & { id: number };
+  }
+
   async getCustosFixos(ativos?: boolean) {
     const params: Record<string, string> = {};
     if (ativos !== undefined) {
@@ -691,14 +906,14 @@ class ApiClient {
     return response.data;
   }
 
-  async criarCustoFixo(data: { descricao: string; valor_mensal: number }) {
+  async criarCustoFixo(data: { descricao: string; valor_mensal: number; dia_previsto_pagamento?: number }) {
     const response = await this.axiosInstance.post("/clinicas/custos-fixos", data);
     return response.data;
   }
 
   async atualizarCustoFixo(
     id: string,
-    data: { descricao: string; valor_mensal: number; ativo?: boolean }
+    data: { descricao: string; valor_mensal: number; ativo?: boolean; dia_previsto_pagamento?: number }
   ) {
     const response = await this.axiosInstance.put(`/clinicas/custos-fixos/${id}`, data);
     return response.data;

@@ -5,7 +5,15 @@ import { DollarSign, TrendingUp, CheckCircle, XCircle, Plus, Pencil } from "luci
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  ModalActions,
+  ModalButton,
+  modalIconProps,
+} from "@/components/ui/dialog"
 import {
   useAssinaturas,
   useAtualizarAssinaturaAdmin,
@@ -228,14 +236,14 @@ export default function AdminFinanceiroPage() {
                   Assinatura ativa
                 </Label>
               </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="secondary" onClick={() => setEditRow(null)}>
+              <ModalActions className="pt-2">
+                <ModalButton variant="danger" type="button" onClick={() => setEditRow(null)}>
                   Cancelar
-                </Button>
-                <Button type="submit" disabled={atualizarAssinatura.isPending}>
+                </ModalButton>
+                <ModalButton variant="primary" type="submit" disabled={atualizarAssinatura.isPending}>
                   {atualizarAssinatura.isPending ? "Salvando…" : "Salvar"}
-                </Button>
-              </div>
+                </ModalButton>
+              </ModalActions>
             </form>
           )}
         </DialogContent>
@@ -316,12 +324,15 @@ export default function AdminFinanceiroPage() {
                 </div>
               </>
             )}
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={criar.isPending} className="gap-2">
-                <Plus className="h-4 w-4" />{criar.isPending ? "Criando..." : "Criar Assinatura"}
-              </Button>
-            </div>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpen(false)}>
+                Cancelar
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criar.isPending} className="inline-flex">
+                <Plus {...modalIconProps} />
+                {criar.isPending ? "Criando..." : "Criar Assinatura"}
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

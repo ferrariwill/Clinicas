@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/ferrariwill/Clinicas/API/internal/rbac"
 	"github.com/ferrariwill/Clinicas/API/middleware"
@@ -21,10 +22,49 @@ type atualizarUsuarioBody struct {
 	TipoUsuarioID     *uint   `json:"tipo_usuario_id"`
 	MaxPacientes      *int    `json:"max_pacientes"`
 	PermiteSimultaneo *bool   `json:"permite_simultaneo"`
+	Especialidade        *string  `json:"especialidade"`
+	PorcentagemRepasse   *float64 `json:"porcentagem_repasse"`
 }
 
 func podeGerenciarEquipeUsuario(papel string) bool {
 	return papel == rbac.PapelDono || papel == rbac.PapelADMGeral
+}
+
+// podeGerenciarGradeAgendaOutros: secretaria/recepção ajustam grade e capacidade na agenda dos profissionais (mesma clínica).
+func podeGerenciarGradeAgendaOutros(papel string) bool {
+	switch papel {
+	case rbac.PapelSecretaria, rbac.PapelDono, rbac.PapelADMGeral, "RECEPCAO":
+		return true
+	default:
+		return false
+	}
+}
+
+func (uc *UsuarioController) podeAcessarAlvoGradeHorarios(c *gin.Context, alvo *models.Usuario, clinicaID, actorID uint, papel string) bool {
+	ok, err := uc.usuarioService.PertenceAClinica(alvo.ID, clinicaID)
+	if err != nil || !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Usuário não pertence à sua clínica"})
+		return false
+	}
+	if alvo.ID == actorID {
+		return true
+	}
+	if podeGerenciarEquipeUsuario(papel) || podeGerenciarGradeAgendaOutros(papel) {
+		return true
+	}
+	c.JSON(http.StatusForbidden, gin.H{"error": "Sem permissão para alterar a grade deste usuário"})
+	return false
+}
+
+// apenasCapacidadeNaAgenda detecta PUT só com max_pacientes / permite_simultaneo (fluxo da tela de grade).
+func apenasCapacidadeNaAgenda(b *atualizarUsuarioBody) bool {
+	if b.Nome != nil || b.Email != nil || b.TipoUsuarioID != nil || b.Especialidade != nil || b.PorcentagemRepasse != nil {
+		return false
+	}
+	if b.Senha != nil && strings.TrimSpace(*b.Senha) != "" {
+		return false
+	}
+	return b.MaxPacientes != nil || b.PermiteSimultaneo != nil
 }
 
 type UsuarioController struct {
@@ -263,14 +303,28 @@ func (uc *UsuarioController) Atualizar(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	if !uc.podeAcessarAlvo(c, existente, clinicaID, actorID, papel) {
-		return
-	}
 
 	var body atualizarUsuarioBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	somenteCapacidadeAgenda := apenasCapacidadeNaAgenda(&body)
+	if somenteCapacidadeAgenda {
+		okClin, err := uc.usuarioService.PertenceAClinica(existente.ID, clinicaID)
+		if err != nil || !okClin {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Usuário não pertence à sua clínica"})
+			return
+		}
+		if !(existente.ID == actorID || podeGerenciarEquipeUsuario(papel) || podeGerenciarGradeAgendaOutros(papel)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Sem permissão para alterar capacidade na agenda deste usuário"})
+			return
+		}
+	} else {
+		if !uc.podeAcessarAlvo(c, existente, clinicaID, actorID, papel) {
+			return
+		}
 	}
 
 	if body.Nome != nil {
@@ -300,11 +354,33 @@ func (uc *UsuarioController) Atualizar(c *gin.Context) {
 		}
 		novoTipo = body.TipoUsuarioID
 	}
-	if body.MaxPacientes != nil && (podeGerenciarEquipeUsuario(papel) || existente.ID == actorID) {
+	if body.MaxPacientes != nil && (podeGerenciarEquipeUsuario(papel) || podeGerenciarGradeAgendaOutros(papel) || existente.ID == actorID) {
 		existente.MaxPacientes = *body.MaxPacientes
 	}
-	if body.PermiteSimultaneo != nil && (podeGerenciarEquipeUsuario(papel) || existente.ID == actorID) {
+	if body.PermiteSimultaneo != nil && (podeGerenciarEquipeUsuario(papel) || podeGerenciarGradeAgendaOutros(papel) || existente.ID == actorID) {
 		existente.PermiteSimultaneo = *body.PermiteSimultaneo
+	}
+
+	if body.Especialidade != nil && !podeGerenciarEquipeUsuario(papel) && existente.ID != actorID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Sem permissão para alterar a especialidade deste usuário"})
+		return
+	}
+
+	// PUT só max_pacientes / permite_simultaneo (tela da grade): não exige tipo_usuario_id válido *nesta* clínica no ator
+	// (ex.: ADM_GERAL com clinica_id trocada — o tipo do admin pode ser de outra clínica no seed).
+	if !somenteCapacidadeAgenda {
+		if err := uc.usuarioService.SincronizarEspecialidadeComTipo(existente, clinicaID, novoTipo, body.Especialidade); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	if body.PorcentagemRepasse != nil {
+		if !podeGerenciarEquipeUsuario(papel) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Sem permissão para alterar porcentagem de repasse"})
+			return
+		}
+		existente.PorcentagemRepasse = services.NormalizarPorcentagemRepasse(*body.PorcentagemRepasse)
 	}
 
 	if err := uc.usuarioService.AtualizarUsuario(existente); err != nil {
@@ -425,6 +501,11 @@ func (uc *UsuarioController) CriarUsuarioClinica(c *gin.Context) {
 		return
 	}
 
+	papelCriador, _ := middleware.ExtrairDoToken[string](c, "papel")
+	if papelCriador != rbac.PapelDono && papelCriador != rbac.PapelADMGeral {
+		dto.PorcentagemRepasse = nil
+	}
+
 	usuarioClinicaID, err := middleware.ExtrairDoToken[uint](c, "clinica_id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Erro ao extrair clinica_id do token"})
@@ -477,7 +558,7 @@ func (uc *UsuarioController) BuscarHorarios(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	if !uc.podeAcessarAlvo(c, alvo, clinicaID, actorID, papel) {
+	if !uc.podeAcessarAlvoGradeHorarios(c, alvo, clinicaID, actorID, papel) {
 		return
 	}
 
@@ -519,13 +600,13 @@ func (uc *UsuarioController) DefinirHorarios(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	if !uc.podeAcessarAlvo(c, alvo, clinicaID, actorID, papel) {
+	if !uc.podeAcessarAlvoGradeHorarios(c, alvo, clinicaID, actorID, papel) {
 		return
 	}
 
 	var req dto.DefinirHorariosRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos", "detalhes": err.Error()})
 		return
 	}
 

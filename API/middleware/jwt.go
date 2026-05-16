@@ -21,6 +21,7 @@ func GerarToken(usuario *models.Usuario) (string, error) {
 		"tipo_usuario_id": usuario.TipoUsuarioID,
 		"clinica_id":      usuario.ClinicaID,
 		"papel":           papel,
+		"especialidade":   usuario.Especialidade,
 		"exp":             time.Now().Add(time.Hour * 24).Unix(),
 	}
 

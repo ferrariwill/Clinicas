@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"time"
+
 	"github.com/ferrariwill/Clinicas/API/models"
 	"gorm.io/gorm"
 )
@@ -9,6 +11,8 @@ type ProntuarioRepository interface {
 	// Criar persiste o registro sempre com clinica_id explícito (ignora valores divergentes no ponteiro).
 	Criar(clinicaID uint, reg *models.ProntuarioRegistro) error
 	ListarPorPaciente(clinicaID, pacienteID uint) ([]models.ProntuarioRegistro, error)
+	// ListarPorProfissionalDesde registros criados pelo profissional na clínica a partir da data (inclusive).
+	ListarPorProfissionalDesde(clinicaID, profissionalID uint, desde time.Time) ([]models.ProntuarioRegistro, error)
 	BuscarPorIDClinica(id, clinicaID uint) (*models.ProntuarioRegistro, error)
 	// AtualizarCampos altera apenas com WHERE id + clinica_id (nunca Save sem escopo de tenant).
 	AtualizarCampos(clinicaID, id uint, titulo, conteudo string) error
@@ -33,6 +37,14 @@ func (r *prontuarioRepository) ListarPorPaciente(clinicaID, pacienteID uint) ([]
 	err := r.db.Where("clinica_id = ? AND paciente_id = ?", clinicaID, pacienteID).
 		Preload("Profissional", "clinica_id = ?", clinicaID).
 		Order("created_at DESC").
+		Find(&list).Error
+	return list, err
+}
+
+func (r *prontuarioRepository) ListarPorProfissionalDesde(clinicaID, profissionalID uint, desde time.Time) ([]models.ProntuarioRegistro, error) {
+	var list []models.ProntuarioRegistro
+	err := r.db.Where("clinica_id = ? AND profissional_id = ? AND created_at >= ?", clinicaID, profissionalID, desde).
+		Order("created_at ASC").
 		Find(&list).Error
 	return list, err
 }

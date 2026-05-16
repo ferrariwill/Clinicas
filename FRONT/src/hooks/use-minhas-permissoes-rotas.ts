@@ -2,6 +2,14 @@ import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/services/api-client"
 import { useAuthStore } from "@/store/auth-store"
 
+/** Mesmo `staleTime`/`gcTime` em `use-auth` (prefetch pós-login) e aqui. */
+export const MINHAS_PERMISSOES_STALE_MS = 10 * 60 * 1000
+export const MINHAS_PERMISSOES_GC_MS = 30 * 60 * 1000
+
+export function minhasPermissoesRotasQueryKey(usuarioId: string | undefined) {
+  return ["minhas-permissoes-rotas", usuarioId] as const
+}
+
 export function rotaPrefixLiberada(
   rotas: string[],
   acessoTotal: boolean,
@@ -76,6 +84,15 @@ export function computeTelasLiberadas(
   const podeRelatorioRecebimentos =
     acessoTotalTelas || rotasApi.some((r) => r === "/clinicas/cobrancas/relatorio-financeiro")
 
+  /** Mesmo perfil do relatório de recebimentos ou rota dedicada de repasse. */
+  const podeRelatorioRepasseProfissionais =
+    acessoTotalTelas ||
+    rotasApi.some(
+      (r) =>
+        r === "/clinicas/cobrancas/relatorio-financeiro" ||
+        r === "/clinicas/cobrancas/relatorio-repasse-profissionais"
+    )
+
   return {
     acessoTotalTelas,
     rotasApi,
@@ -90,6 +107,7 @@ export function computeTelasLiberadas(
     podeGestaoTelas,
     podePagamentos,
     podeRelatorioRecebimentos,
+    podeRelatorioRepasseProfissionais,
   }
 }
 
@@ -97,11 +115,11 @@ export function useMinhasPermissoesRotas() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const usuarioId = useAuthStore((s) => s.usuario?.id)
   return useQuery({
-    queryKey: ["minhas-permissoes-rotas", usuarioId],
+    queryKey: minhasPermissoesRotasQueryKey(usuarioId),
     queryFn: () => apiClient.getMinhasPermissoesRotas(),
     enabled: isAuthenticated && Boolean(usuarioId),
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    /** Evita GET em toda troca de rota: várias telas + o layout usam a mesma query. Após login, `use-auth` dispara prefetch com a mesma chave. */
+    staleTime: MINHAS_PERMISSOES_STALE_MS,
+    gcTime: MINHAS_PERMISSOES_GC_MS,
   })
 }

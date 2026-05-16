@@ -1,15 +1,21 @@
 package services
 
 import (
+	"errors"
 	"time"
 
+	dto "github.com/ferrariwill/Clinicas/API/models/DTO"
 	"github.com/ferrariwill/Clinicas/API/models"
 	"github.com/ferrariwill/Clinicas/API/repositories"
+	"gorm.io/gorm"
 )
 
 type AgendaService interface {
 	Criar(agenda models.Agenda, procedimentosExtras []uint) (models.Agenda, error)
+	PreviewAgendaLote(clinicaID uint, req dto.PreviewAgendaLoteRequest) ([]dto.PreviewAgendaLoteSessaoResponse, error)
+	CriarAgendaLote(clinicaID uint, req dto.CriarAgendaLoteRequest) ([]models.Agenda, error)
 	Listar(clinicaID uint, dia *time.Time, usuarioID *uint) ([]models.Agenda, error)
+	ListarPassadosPorPaciente(clinicaID, pacienteID uint, limite int) ([]models.Agenda, error)
 	BuscarPorIDClinica(clinicaID, agendaID uint) (*models.Agenda, error)
 	AtualizarStatus(clinicaID, id, statusID, usuarioLancamentoID uint) error
 	LiberarCobranca(clinicaID, agendaID uint) error
@@ -21,12 +27,18 @@ type AgendaService interface {
 type agendaService struct {
 	agendaRepository repositories.AgendaReposiory
 	configRepo       repositories.ConfiguracaoRepository
+	pacienteRepo     repositories.PacienteRepository
 }
 
-func NovaAgendaService(agendaRepository repositories.AgendaReposiory, configRepo repositories.ConfiguracaoRepository) AgendaService {
+func NovaAgendaService(
+	agendaRepository repositories.AgendaReposiory,
+	configRepo repositories.ConfiguracaoRepository,
+	pacienteRepo repositories.PacienteRepository,
+) AgendaService {
 	return &agendaService{
 		agendaRepository: agendaRepository,
 		configRepo:       configRepo,
+		pacienteRepo:     pacienteRepo,
 	}
 }
 
@@ -36,6 +48,20 @@ func (r *agendaService) Criar(agenda models.Agenda, procedimentosExtras []uint) 
 
 func (r *agendaService) Listar(clinicaID uint, dia *time.Time, usuarioID *uint) ([]models.Agenda, error) {
 	return r.agendaRepository.Listar(clinicaID, dia, usuarioID)
+}
+
+func (r *agendaService) ListarPassadosPorPaciente(clinicaID, pacienteID uint, limite int) ([]models.Agenda, error) {
+	if pacienteID == 0 {
+		return nil, errors.New("paciente inválido")
+	}
+	_, err := r.pacienteRepo.BuscarPorIDClinica(pacienteID, clinicaID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("paciente não encontrado nesta clínica")
+		}
+		return nil, err
+	}
+	return r.agendaRepository.ListarPassadosPorPaciente(clinicaID, pacienteID, limite)
 }
 
 func (r *agendaService) BuscarPorIDClinica(clinicaID, agendaID uint) (*models.Agenda, error) {

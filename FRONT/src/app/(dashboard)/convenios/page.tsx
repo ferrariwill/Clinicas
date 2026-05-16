@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, ModalActions, ModalButton } from "@/components/ui/dialog"
 import type { ConvenioRequest, ConvenioResponse } from "@/types/api"
 import {
   useConveniosCatalogo,
@@ -166,14 +166,14 @@ export default function ConveniosPage() {
               <Label htmlFor="cnome">Nome</Label>
               <Input id="cnome" value={nome} onChange={(e) => setNome(e.target.value)} required />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpen(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={criar.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={criar.isPending}>
                 {criar.isPending ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>
@@ -198,14 +198,14 @@ export default function ConveniosPage() {
                 Ativo
               </Label>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
+            <ModalActions className="pt-2">
+              <ModalButton variant="danger" type="button" onClick={() => setOpenEdit(false)}>
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={atualizar.isPending}>
+              </ModalButton>
+              <ModalButton variant="primary" type="submit" disabled={atualizar.isPending}>
                 {atualizar.isPending ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
+              </ModalButton>
+            </ModalActions>
           </form>
         </DialogContent>
       </Dialog>

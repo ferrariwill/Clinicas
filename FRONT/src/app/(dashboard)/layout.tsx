@@ -15,8 +15,10 @@ import {
   Link2,
   PiggyBank,
   BarChart3,
+  Coins,
   UsersRound,
   Layers,
+  Activity,
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { computeTelasLiberadas, useMinhasPermissoesRotas } from "@/hooks/use-minhas-permissoes-rotas"
@@ -51,6 +53,7 @@ export default function DashboardLayout({
     podeGestaoTelas,
     podePagamentos,
     podeRelatorioRecebimentos,
+    podeRelatorioRepasseProfissionais,
   } = useMemo(() => computeTelasLiberadas(permParaMenu, userRole), [permParaMenu, userRole])
 
   useEffect(() => {
@@ -60,6 +63,10 @@ export default function DashboardLayout({
   }, [isAuthenticated, router])
 
   const pathname = usePathname()
+
+  const mostrarResumoClinicoProfissional = ["MEDICO", "DONO", "DONO_CLINICA"].includes(
+    (userRole ?? "").trim().toUpperCase()
+  )
 
   if (!isAuthenticated) {
     return null
@@ -159,7 +166,11 @@ export default function DashboardLayout({
                 {podeFinanceiro && (
                   <Link
                     href="/financeiro"
-                    className={desktopNavLink(pathname.startsWith("/financeiro") && !pathname.startsWith("/financeiro/recebimentos"))}
+                    className={desktopNavLink(
+                      pathname.startsWith("/financeiro") &&
+                        !pathname.startsWith("/financeiro/recebimentos") &&
+                        !pathname.startsWith("/financeiro/repasse-profissionais")
+                    )}
                   >
                     <PiggyBank className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
                     <span>Gestão Financeira</span>
@@ -169,6 +180,15 @@ export default function DashboardLayout({
                   <Link href="/financeiro/recebimentos" className={desktopNavLink(pathname.startsWith("/financeiro/recebimentos"))}>
                     <BarChart3 className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
                     <span>Recebimentos (gateway)</span>
+                  </Link>
+                )}
+                {podeRelatorioRepasseProfissionais && (
+                  <Link
+                    href="/financeiro/repasse-profissionais"
+                    className={desktopNavLink(pathname.startsWith("/financeiro/repasse-profissionais"))}
+                  >
+                    <Coins className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                    <span>Repasse profissionais</span>
                   </Link>
                 )}
                 {podePagamentos && (
@@ -284,6 +304,15 @@ export default function DashboardLayout({
                         <span>Pacientes</span>
                       </Link>
                     )}
+                    {mostrarResumoClinicoProfissional && (
+                      <Link
+                        href="/meu-resumo-clinico"
+                        className={linkClassMobile(pathname.startsWith("/meu-resumo-clinico"))}
+                      >
+                        <Activity className="h-4 w-4 shrink-0" aria-hidden />
+                        <span>Resumo</span>
+                      </Link>
+                    )}
                     {podeProcedimentos && (
                       <Link href="/procedimentos" className={linkClassMobile(pathname.startsWith("/procedimentos"))}>
                         <FlaskConical className="h-4 w-4 shrink-0" aria-hidden />
@@ -299,7 +328,11 @@ export default function DashboardLayout({
                     {podeFinanceiro && (
                       <Link
                         href="/financeiro"
-                        className={linkClassMobile(pathname.startsWith("/financeiro") && !pathname.startsWith("/financeiro/recebimentos"))}
+                        className={linkClassMobile(
+                          pathname.startsWith("/financeiro") &&
+                            !pathname.startsWith("/financeiro/recebimentos") &&
+                            !pathname.startsWith("/financeiro/repasse-profissionais")
+                        )}
                       >
                         <PiggyBank className="h-4 w-4 shrink-0" aria-hidden />
                         <span>Financ.</span>
@@ -309,6 +342,15 @@ export default function DashboardLayout({
                       <Link href="/financeiro/recebimentos" className={linkClassMobile(pathname.startsWith("/financeiro/recebimentos"))}>
                         <BarChart3 className="h-4 w-4 shrink-0" aria-hidden />
                         <span>Receb.</span>
+                      </Link>
+                    )}
+                    {podeRelatorioRepasseProfissionais && (
+                      <Link
+                        href="/financeiro/repasse-profissionais"
+                        className={linkClassMobile(pathname.startsWith("/financeiro/repasse-profissionais"))}
+                      >
+                        <Coins className="h-4 w-4 shrink-0" aria-hidden />
+                        <span>Repasse</span>
                       </Link>
                     )}
                     {podePagamentos && (

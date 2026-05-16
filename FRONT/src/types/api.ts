@@ -19,6 +19,8 @@ export interface UsuarioInfo {
   ativo: boolean;
   /** Primeiro acesso ou recuperação de senha: o sistema exige trocar a senha. */
   obrigar_troca_senha?: boolean;
+  /** MEDICO | FISIOTERAPEUTA | DENTISTA — papéis DONO e MEDICO na clínica. */
+  especialidade?: string;
 }
 
 export interface AlterarSenhaRequest {
@@ -96,6 +98,22 @@ export interface PacienteResponse {
   endereco?: string;
   clinic_id: string;
   criado_em: string;
+  /** ISO: lembrete de retorno / 1ª sessão (plano de tratamento). */
+  plano_retorno_previsto_em?: string;
+  /** Total de sessões previstas no último plano por sessões. */
+  plano_sessoes_previstas?: number;
+}
+
+/** Corpo de POST /clinicas/plano-tratamento */
+export interface PlanoTratamentoRequest {
+  modo: "RETORNO" | "SESSOES";
+  paciente_id: number;
+  usuario_id: number;
+  procedimento_id: number;
+  data_hora: string;
+  sessoes_previstas?: number;
+  intervalo_dias?: number;
+  observacoes?: string;
 }
 
 // Schedule Types
@@ -107,6 +125,34 @@ export interface AgendaRequest {
   procedimento_ids?: string[];
   data_horario: string;
   usuario_id: string;
+}
+
+/** POST /clinicas/agenda/lote/preview — dias_semana: 0=domingo … 6=sábado (igual Go/JS). */
+export interface PreviewAgendaLoteRequest {
+  paciente_id: string;
+  usuario_id: string;
+  procedimento_id?: string;
+  procedimento_ids?: string[];
+  quantidade_sessoes: number;
+  dias_semana: number[];
+  hora: string;
+  data_referencia: string;
+}
+
+export interface PreviewAgendaLoteSessao {
+  indice: number;
+  data_hora: string;
+  ok: boolean;
+  erro?: string;
+}
+
+/** POST /clinicas/agenda/lote */
+export interface CriarAgendaLoteRequest {
+  paciente_id: string;
+  usuario_id: string;
+  procedimento_id?: string;
+  procedimento_ids?: string[];
+  sessoes: { data_hora: string }[];
 }
 
 export interface AgendaResponse {
@@ -123,6 +169,8 @@ export interface AgendaResponse {
   data_horario: string;
   usuario_id: string;
   usuario_nome?: string;
+  /** Especialidade do profissional (MEDICO / FISIOTERAPEUTA / DENTISTA), quando a API envia o usuário. */
+  usuario_especialidade?: string;
   status: string;
   conflito?: boolean;
   /** ISO: médico liberou para secretaria cobrar (módulo Asaas). */
@@ -202,12 +250,36 @@ export interface ProntuarioRegistroSwagger {
   editavel: boolean; // false se > 24h
 }
 
+export interface CriarAtestadoRequest {
+  paciente_id: string;
+  tipo: "HORAS" | "DIAS";
+  quantidade: number;
+  cid10: string;
+  /** Opcional: horário 24h HH:MM; envie início e fim juntos. */
+  consulta_hora_inicio?: string;
+  consulta_hora_fim?: string;
+}
+
+export interface AtestadoMedicoResponse {
+  id: string;
+  paciente_id: string;
+  profissional_id?: string;
+  tipo: "HORAS" | "DIAS";
+  quantidade: number;
+  cid10: string;
+  texto_gerado: string;
+  criado_em: string;
+  profissional?: { nome?: string; especialidade?: string };
+}
+
 // Procedure Types
 export interface ProcedimentoRequest {
   nome: string;
   descricao?: string;
   duracao_minutos: number;
   valor: number;
+  /** Vazio: todas; senão MEDICO | FISIOTERAPEUTA | DENTISTA (igual ao cadastro do profissional). */
+  especialidade?: string;
 }
 
 export interface ProcedimentoResponse {
@@ -216,6 +288,7 @@ export interface ProcedimentoResponse {
   descricao?: string;
   duracao_minutos: number;
   valor: number;
+  especialidade?: string;
   ativo?: boolean;
   clinic_id: string;
   criado_em: string;
@@ -240,12 +313,16 @@ export interface UsuarioResponse {
   nome: string;
   email: string;
   tipo_usuario: string;
+  /** MEDICO | FISIOTERAPEUTA | DENTISTA quando aplicável. */
+  especialidade?: string;
   /** Papel RBAC (MEDICO, DONO, …) — usar para filtros; `tipo_usuario` pode ser o nome amigável. */
   papel?: string;
   /** Máximo de atendimentos simultâneos no mesmo intervalo (com `permite_simultaneo`). */
   max_pacientes?: number;
   /** Se true, a agenda pode empilhar até `max_pacientes` agendamentos sobrepostos. */
   permite_simultaneo?: boolean;
+  /** Percentual 0–100 do valor bruto da consulta pago ao profissional (repasse). */
+  porcentagem_repasse?: number;
   /** ID do tipo (Médico, Secretária, …) na clínica, quando a API envia aninhado. */
   tipo_usuario_id?: number;
   telefone?: string;
@@ -313,6 +390,27 @@ export interface MetricasOperacionaisSwagger {
   lotacao_media?: number;
   taxa_conversao?: number;
   satisfacao_media?: number;
+}
+
+/** GET /clinicas/me/dashboard-clinico — prontuário + atestados do profissional logado. */
+export interface MedicoDashboardClinicoResponse {
+  semanas: number;
+  cid_mais_comuns: MedicoDashboardCIDItem[];
+  volume_por_semana: MedicoDashboardSemanaVol[];
+}
+
+export interface MedicoDashboardCIDItem {
+  cid: string;
+  total: number;
+}
+
+export interface MedicoDashboardSemanaVol {
+  ano: number;
+  semana: number;
+  rotulo: string;
+  prontuarios: number;
+  atestados: number;
+  total: number;
 }
 
 // Insurance / convênios (API: nome + ativo; campos extras opcionais)
@@ -383,9 +481,9 @@ export interface ResumoFinanceiro {
   totalSaidasLancamentos?: number;
   /** Soma mensal de custos fixos ativos */
   custosFixosMensal?: number;
-  /** Meses-calendário usados para projetar custos fixos */
+  /** Meses-calendário cobertos pelo intervalo (referência; custos fixos usam dia previsto de pagamento) */
   mesesNoPeriodo?: number;
-  /** custosFixosMensal × mesesNoPeriodo */
+  /** Soma dos custos fixos ativos cujo vencimento (dia do mês) cai dentro do período filtrado */
   custosFixosNoPeriodo?: number;
   /** Lançamentos + custos fixos no período */
   totalSaidas: number;
@@ -399,6 +497,8 @@ export interface CustoFixo {
   descricao: string;
   valor_mensal: number;
   ativo: boolean;
+  /** Dia do mês em que o pagamento costuma ocorrer (1–31); usado no resumo do período */
+  dia_previsto_pagamento: number;
   clinica_id?: string;
   criado_em?: string;
   atualizado_em?: string;
@@ -416,4 +516,87 @@ export interface FiltrosFinanceiro {
   dataInicio?: string;
   dataFim?: string;
   categoria?: 'PARTICULAR' | 'CONVENIO';
+}
+
+/** GET /clinicas/financeiro/fechamento/preview */
+export interface FechamentoPreviewResponse {
+  data_inicio: string;
+  data_fim: string;
+  quantidade_lancamentos: number;
+  quantidade_itens_repasse: number;
+  total_entradas: number;
+  total_saidas: number;
+  total_repasses: number;
+  lucro_liquido: number;
+  /** Objeto JSON com lancamentos, repasse_linhas e repasse_detalhes. */
+  detalhamento: unknown;
+}
+
+export interface FechamentoDetalhamentoPayload {
+  lancamentos: FechamentoDetalheLancamento[];
+  repasse_linhas: RepasseLinhaProfissional[];
+  repasse_detalhes: RepasseDetalheProfissional[];
+}
+
+export interface FechamentoDetalheLancamento {
+  id: number;
+  data: string;
+  descricao: string;
+  valor: number;
+  tipo: string;
+  categoria: string;
+  usuario_id: number;
+  criado_em: string;
+}
+
+export interface RepasseLinhaProfissional {
+  usuario_id: number;
+  nome: string;
+  especialidade: string;
+  porcentagem_repasse: number;
+  quantidade_atendimentos: number;
+  valor_base_total: number;
+  valor_repasse_total: number;
+}
+
+export interface RepasseDetalheProfissional {
+  cobranca_id: number;
+  agenda_id: number;
+  usuario_id: number;
+  data_hora: string;
+  paciente_nome: string;
+  valor_base: number;
+  porcentagem_repasse: number;
+  valor_repasse: number;
+}
+
+export interface FechamentoListaItem {
+  id: number;
+  data_inicio: string;
+  data_fim: string;
+  total_entradas: number;
+  total_saidas: number;
+  total_repasses: number;
+  lucro_liquido: number;
+  status: string;
+  criado_em: string;
+}
+
+export interface FechamentoDetalheResponse {
+  id: number;
+  clinica_id: number;
+  data_inicio: string;
+  data_fim: string;
+  total_entradas: number;
+  total_saidas: number;
+  total_repasses: number;
+  lucro_liquido: number;
+  status: string;
+  criado_em: string;
+  detalhamento_json: FechamentoDetalhamentoPayload;
+}
+
+export interface CriarFechamentoRequest {
+  dataInicio: string;
+  dataFim: string;
 }
