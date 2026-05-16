@@ -9,11 +9,7 @@ import {
   MAPA_DOR_COR_CORPO,
   MAPA_DOR_COR_DOR,
 } from "@/components/mapa-dor-region-path"
-import {
-  MUSCULOS_ANTERIOR,
-  MUSCULOS_POSTERIOR,
-  type MapaDeDorValor,
-} from "@/components/mapa-de-dor-model"
+import { MUSCULOS_ANTERIOR, MUSCULOS_POSTERIOR } from "@/components/mapa-de-dor-model"
 
 const BodyModel = dynamic(() => import("react-body-highlighter"), { ssr: false })
 
@@ -28,12 +24,10 @@ function musclesNaVista(vista: "anterior" | "posterior", dores: string[]): Muscl
 }
 
 export function MapaDeDorCorpoPane({
-  estado,
   doresCorpo,
   readOnly,
   onToggle,
 }: {
-  estado: MapaDeDorValor
   doresCorpo: string[]
   readOnly: boolean
   onToggle: (id: string) => void

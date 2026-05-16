@@ -40,7 +40,10 @@ export function BuscaCID10({ id = "busca-cid10", value, onChange, usuarioId, dis
     setDropPos({ top: r.bottom + 4, left: r.left, width: r.width })
   }, [])
 
-  const recentes = React.useMemo(() => carregarCid10Recentes(usuarioId ?? undefined), [usuarioId, tickRecentes])
+  const recentes = React.useMemo(() => {
+    void tickRecentes
+    return carregarCid10Recentes(usuarioId ?? undefined)
+  }, [usuarioId, tickRecentes])
 
   const resultados = React.useMemo(() => buscarNaListaCID10(value), [value])
 

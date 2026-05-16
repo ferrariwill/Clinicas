@@ -143,7 +143,6 @@ export function MapaDeDor({
       <div className="mt-4 min-h-[280px]" role="tabpanel">
         {aba === "corpo" && (
           <MapaDeDorCorpoPane
-            estado={selectedAreas}
             doresCorpo={doresCorpo}
             readOnly={readOnly}
             onToggle={alternarParte}
