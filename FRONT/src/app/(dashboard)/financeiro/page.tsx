@@ -21,7 +21,8 @@ import {
 } from "@/hooks/use-financeiro"
 import { apiClient } from "@/services/api-client"
 import { LancamentoFinanceiro, FiltrosFinanceiro, ResumoFinanceiro, CustoFixo } from "@/types/api"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils/cn"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -528,23 +529,28 @@ export default function FinanceiroPage() {
             </div>
             <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end lg:w-auto lg:shrink-0">
               {podeRelatorioRepasseProfissionais && (
-                <Button asChild variant="outline" className="w-full justify-center gap-2 sm:w-auto">
-                  <Link href="/financeiro/repasse-profissionais">
-                    <UsersRound className="h-4 w-4 shrink-0" aria-hidden />
-                    Repasse aos profissionais
-                  </Link>
-                </Button>
+                <Link
+                  href="/financeiro/repasse-profissionais"
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "w-full justify-center gap-2 sm:w-auto"
+                  )}
+                >
+                  <UsersRound className="h-4 w-4 shrink-0" aria-hidden />
+                  Repasse aos profissionais
+                </Link>
               )}
               {podeVerTudo && (
-                <Button
-                  asChild
-                  className="w-full justify-center gap-2 bg-sky-700 text-white hover:bg-sky-800 sm:w-auto"
+                <Link
+                  href="/financeiro/fechamento/novo"
+                  className={cn(
+                    buttonVariants(),
+                    "w-full justify-center gap-2 bg-sky-700 text-white hover:bg-sky-800 sm:w-auto"
+                  )}
                 >
-                  <Link href="/financeiro/fechamento/novo">
-                    <CalendarCheck2 className="h-4 w-4 shrink-0" aria-hidden />
-                    Novo fechamento de período
-                  </Link>
-                </Button>
+                  <CalendarCheck2 className="h-4 w-4 shrink-0" aria-hidden />
+                  Novo fechamento de período
+                </Link>
               )}
             </div>
           </div>
